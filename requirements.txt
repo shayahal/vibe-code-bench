@@ -1,12 +1,69 @@
+# Core LangChain dependencies
 langchain>=0.1.0
 langchain-openai>=0.0.5
 langchain-anthropic>=0.1.0
 langchain-community>=0.0.20
 openai>=1.12.0
+
+# Environment and HTTP
 python-dotenv>=1.0.0
 requests>=2.31.0
+httpx>=0.25.0
+
+# HTML parsing
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
+
+# Web Application Security Tools (pip-installable)
+sqlmap>=1.8.0
+xsstrike>=3.1.5
+paramspider>=2.1.0
+arjun>=2.2.0
+wfuzz>=3.1.0
+wapiti3>=3.1.0
+
+# Reconnaissance Tools
+theHarvester>=4.5.0
+
+# Active Directory Tools
+bloodhound>=4.0.0
+crackmapexec>=5.0.0
+
+# Cloud Security Tools
+pacu>=1.0.0
+scoutsuite>=5.0.0
+
+# API Security Tools
+rest-attacker>=1.0.0
+
+# ============================================================================
+# NOTE: The following SOTA tools are NOT pip-installable and must be installed separately:
+# ============================================================================
+#
+# Go-based Tools (install via: go install ...):
+# - nuclei: go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+# - dalfox: go install github.com/hahwul/dalfox/v2@latest
+# - subfinder: go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+# - amass: go install github.com/owasp-amass/amass/v4/...@master
+# - gobuster: go install github.com/OJ/gobuster/v3@latest
+# - ffuf: go install github.com/ffuf/ffuf/v2@latest
+#
+# System Package Tools (install via apt/brew):
+# - nmap: apt install nmap or brew install nmap
+# - masscan: apt install masscan or brew install masscan
+# - nikto: apt install nikto or brew install nikto
+# - hashcat: apt install hashcat or brew install hashcat
+# - john: apt install john or brew install john-jumbo
+# - hydra: apt install hydra or brew install hydra
+# - metasploit: apt install metasploit-framework
+#
+# Rust-based Tools (install via: cargo install ...):
+# - rustscan: cargo install rustscan
+#
+# Java-based Tools:
+# - OWASP ZAP: Download from https://www.zaproxy.org/
+#
+# ============================================================================
 
 # Testing dependencies
 pytest>=7.4.0
