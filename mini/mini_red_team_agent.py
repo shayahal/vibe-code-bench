@@ -3,7 +3,7 @@ Mini Red Team Agent
 
 A CLI-based security testing agent that:
 - Takes a URL as input
-- Uses Claude Mini (claude-3-haiku) for intelligent tool selection
+- Uses Claude Mini (anthropic/claude-3-haiku) via OpenRouterfor intelligent tool selection
 - Performs automated security testing (XSS, SQL injection, security headers, authentication)
 - Generates comprehensive security assessment reports
 - Uses LangFuse for observability and trace tracking
@@ -23,10 +23,10 @@ load_dotenv()
 
 # Try importing LangChain
 try:
-    from langchain_anthropic import ChatAnthropic
+    from langchain_openai import ChatOpenAI
     from langchain.agents import create_agent
 except ImportError:
-    print("Error: langchain-anthropic is required. Install with: pip install langchain-anthropic")
+    print("Error: langchain-openai is required. Install with: pip install langchain-openai")
     sys.exit(1)
 
 # Import LangFuse (required) - LangChain integration
@@ -65,7 +65,7 @@ def main():
     parser.add_argument(
         "--api-key",
         type=str,
-        help="Anthropic API key (or set ANTHROPIC_API_KEY env var)"
+        help="OpenRouter API key (or set OPENROUTER_API_KEY env var)"
     )
     
     args = parser.parse_args()
@@ -103,19 +103,24 @@ def main():
         sys.exit(1)
     
     # Get API key
-    api_key = args.api_key or os.getenv("ANTHROPIC_API_KEY")
+    api_key = args.api_key or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        print("Error: ANTHROPIC_API_KEY not found. Set it as env var or use --api-key")
+        print("Error: OPENROUTER_API_KEY not found. Set it as env var or use --api-key")
         sys.exit(1)
     
-    # Initialize Claude Mini (claude-3-haiku is the mini/fast model)
+    # Initialize Claude Mini via OpenRouter (anthropic/claude-3-haiku is the mini/fast model)
     # Increased max_tokens for security testing tasks
     try:
-        llm = ChatAnthropic(
-            model="claude-3-haiku-20240307",  # Claude Mini
+        llm = ChatOpenAI(
+            model="anthropic/claude-3-haiku",  # Claude Mini via OpenRouter
             api_key=api_key,
             temperature=0.7,
             max_tokens=2000,  # Increased for security testing tasks
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
+                "X-Title": "Mini Red-Team Agent"
+            },
             callbacks=[langfuse_handler]
         )
     except Exception as e:
@@ -178,7 +183,8 @@ def main():
                 "callbacks": [langfuse_handler],
                 "metadata": {
                     "url": args.url,
-                    "model": "claude-3-haiku-20240307",
+                    "model": "anthropic/claude-3-haiku",
+                    "provider": "openrouter",
                     "timestamp": datetime.now().isoformat()
                 }
             }
@@ -284,7 +290,6 @@ def main():
         
         # Fallback: directly call the tool
         print("\nFalling back to direct tool call...")
-        from tools import browse_url
         result = browse_url(args.url)
         print("\nResult:")
         print("-" * 60)
