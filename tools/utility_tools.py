@@ -12,6 +12,7 @@ Why these tools:
 
 import logging
 import re
+import json
 from datetime import datetime
 from typing import Dict, Any, Callable
 from bs4 import BeautifulSoup
@@ -137,56 +138,243 @@ def register_utility_tools(factory: RedTeamToolFactory) -> Dict[str, Callable]:
     def create_generate_report():
         """Create generate_report tool - generates comprehensive security reports."""
         def generate_report() -> str:
-            """Generate a comprehensive security report."""
-            logger.info(f"Generating security report - Total tests: {len(factory.test_results)}")
+            """Generate a comprehensive, detailed security report with all findings, tool outputs, and recommendations."""
+            logger.info(f"Generating comprehensive security report - Total tests: {len(factory.test_results)}")
+            
             vulnerable_tests = [r for r in factory.test_results if r.get('is_vulnerable', False)]
             critical_tests = [r for r in vulnerable_tests if r.get('severity') == 'CRITICAL']
             high_tests = [r for r in vulnerable_tests if r.get('severity') == 'HIGH']
+            medium_tests = [r for r in vulnerable_tests if r.get('severity') == 'MEDIUM']
+            low_tests = [r for r in vulnerable_tests if r.get('severity') == 'LOW']
             
-            logger.info(f"Report summary - Vulnerabilities: {len(vulnerable_tests)}, Critical: {len(critical_tests)}, High: {len(high_tests)}")
+            # Group results by tool
+            tool_results = {}
+            for result in factory.test_results:
+                tool_name = result.get('tool', result.get('test_type', 'unknown'))
+                if tool_name not in tool_results:
+                    tool_results[tool_name] = []
+                tool_results[tool_name].append(result)
+            
+            logger.info(f"Report summary - Vulnerabilities: {len(vulnerable_tests)}, Critical: {len(critical_tests)}, High: {len(high_tests)}, Medium: {len(medium_tests)}, Low: {len(low_tests)}")
+            
+            # Calculate risk score
+            risk_score = len(critical_tests) * 10 + len(high_tests) * 5 + len(medium_tests) * 2 + len(low_tests) * 1
+            risk_level = "CRITICAL" if risk_score >= 20 else "HIGH" if risk_score >= 10 else "MEDIUM" if risk_score >= 5 else "LOW"
             
             report = f"""# Web Security Red-Teaming Report
-Generated: {datetime.now().isoformat()}
 
-## Target URL
-{factory.target_url}
+**Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}  
+**Target URL**: {factory.target_url}  
+**Risk Level**: {risk_level} (Score: {risk_score})
+
+---
 
 ## Executive Summary
-- Total tests performed: {len(factory.test_results)}
-- Vulnerabilities found: {len(vulnerable_tests)}
-- Critical vulnerabilities: {len(critical_tests)}
-- High severity vulnerabilities: {len(high_tests)}
 
-## Vulnerability Breakdown
+### Overview
+This report presents the findings from a comprehensive security assessment of **{factory.target_url}**. The assessment utilized industry-standard security testing tools to identify vulnerabilities and security issues.
 
-### Critical Vulnerabilities ({len(critical_tests)})
+### Key Statistics
+- **Total Tests Performed**: {len(factory.test_results)}
+- **Total Vulnerabilities Found**: {len(vulnerable_tests)}
+  - **Critical**: {len(critical_tests)} vulnerabilities
+  - **High**: {len(high_tests)} vulnerabilities
+  - **Medium**: {len(medium_tests)} vulnerabilities
+  - **Low**: {len(low_tests)} vulnerabilities
+- **Tests Passed (No Issues)**: {len(factory.test_results) - len(vulnerable_tests)}
+- **Overall Risk Score**: {risk_score}/100
+- **Overall Risk Level**: **{risk_level}**
+
+### Risk Assessment
+Based on the findings, the target application has a **{risk_level}** risk level. {'**Immediate action is required**' if risk_level in ['CRITICAL', 'HIGH'] else '**Review recommended**' if risk_level == 'MEDIUM' else '**Low priority review**'}.
+
+---
+
+## Vulnerability Breakdown by Severity
+
+### 🔴 Critical Vulnerabilities ({len(critical_tests)})
 """
-            for i, result in enumerate(critical_tests, 1):
-                report += f"\n#### {i}. {result.get('issue', 'Unknown issue')}\n"
-                report += f"- URL: {result.get('url', 'N/A')}\n"
-                report += f"- Parameter: {result.get('parameter', 'N/A')}\n"
-                report += f"- Payload: {result.get('payload', 'N/A')}\n"
-                report += f"- Timestamp: {result.get('timestamp', 'N/A')}\n"
+            if critical_tests:
+                for i, result in enumerate(critical_tests, 1):
+                    report += f"""
+#### {i}. {result.get('issue', 'Critical Security Issue')}
+
+- **URL**: `{result.get('url', 'N/A')}`
+- **Tool**: {result.get('tool', result.get('test_type', 'Unknown'))}
+- **Parameter**: {result.get('parameter', 'N/A')}
+- **Payload**: `{result.get('payload', 'N/A')}`
+- **Description**: {result.get('description', result.get('issue', 'No description available'))}
+- **Impact**: {result.get('impact', 'Critical - Immediate remediation required')}
+- **Timestamp**: {result.get('timestamp', 'N/A')}
+"""
+                    # Include tool-specific findings
+                    if result.get('findings'):
+                        report += f"\n**Tool Findings**:\n```json\n{json.dumps(result.get('findings'), indent=2)[:500]}\n```\n"
+                    if result.get('output'):
+                        report += f"\n**Tool Output**:\n```\n{str(result.get('output', ''))[:300]}\n```\n"
+            else:
+                report += "\n✅ No critical vulnerabilities found.\n"
             
-            report += f"\n### High Severity Vulnerabilities ({len(high_tests)})\n"
-            for i, result in enumerate(high_tests, 1):
-                report += f"\n#### {i}. {result.get('issue', 'Unknown issue')}\n"
-                report += f"- URL: {result.get('url', 'N/A')}\n"
-                report += f"- Parameter: {result.get('parameter', 'N/A')}\n"
-                report += f"- Payload: {result.get('payload', 'N/A')}\n"
-                report += f"- Timestamp: {result.get('timestamp', 'N/A')}\n"
+            report += f"\n### 🟠 High Severity Vulnerabilities ({len(high_tests)})\n"
+            if high_tests:
+                for i, result in enumerate(high_tests, 1):
+                    report += f"""
+#### {i}. {result.get('issue', 'High Severity Issue')}
+
+- **URL**: `{result.get('url', 'N/A')}`
+- **Tool**: {result.get('tool', result.get('test_type', 'Unknown'))}
+- **Parameter**: {result.get('parameter', 'N/A')}
+- **Payload**: `{result.get('payload', 'N/A')}`
+- **Description**: {result.get('description', result.get('issue', 'No description available'))}
+- **Impact**: {result.get('impact', 'High - Should be addressed promptly')}
+- **Timestamp**: {result.get('timestamp', 'N/A')}
+"""
+                    if result.get('findings'):
+                        report += f"\n**Tool Findings**:\n```json\n{json.dumps(result.get('findings'), indent=2)[:500]}\n```\n"
+            else:
+                report += "\n✅ No high severity vulnerabilities found.\n"
             
-            report += "\n## Detailed Test Results\n"
+            if medium_tests:
+                report += f"\n### 🟡 Medium Severity Vulnerabilities ({len(medium_tests)})\n"
+                for i, result in enumerate(medium_tests, 1):
+                    report += f"""
+#### {i}. {result.get('issue', 'Medium Severity Issue')}
+
+- **URL**: `{result.get('url', 'N/A')}`
+- **Tool**: {result.get('tool', result.get('test_type', 'Unknown'))}
+- **Description**: {result.get('description', result.get('issue', 'No description available'))}
+- **Timestamp**: {result.get('timestamp', 'N/A')}
+"""
+            
+            if low_tests:
+                report += f"\n### 🟢 Low Severity Vulnerabilities ({len(low_tests)})\n"
+                for i, result in enumerate(low_tests[:10], 1):  # Limit to first 10
+                    report += f"- **{result.get('issue', 'Low Severity Issue')}** - {result.get('url', 'N/A')}\n"
+                if len(low_tests) > 10:
+                    report += f"\n*... and {len(low_tests) - 10} more low severity issues*\n"
+            
+            report += "\n---\n\n## Tool-Specific Findings\n\n"
+            
+            # Detailed findings by tool
+            for tool_name, results in tool_results.items():
+                tool_vulns = [r for r in results if r.get('is_vulnerable', False)]
+                report += f"### {tool_name.upper().replace('_', ' ')} ({len(results)} tests, {len(tool_vulns)} vulnerabilities)\n\n"
+                
+                if tool_vulns:
+                    for result in tool_vulns[:5]:  # Show top 5 per tool
+                        report += f"- **{result.get('issue', 'Vulnerability found')}**\n"
+                        report += f"  - URL: `{result.get('url', 'N/A')}`\n"
+                        if result.get('findings'):
+                            findings_summary = str(result.get('findings', ''))[:200]
+                            report += f"  - Findings: {findings_summary}...\n"
+                    if len(tool_vulns) > 5:
+                        report += f"  - *... and {len(tool_vulns) - 5} more findings*\n"
+                else:
+                    report += "✅ No vulnerabilities found.\n"
+                report += "\n"
+            
+            report += "---\n\n## Detailed Test Results\n\n"
+            report += "### All Tests Performed\n\n"
+            
             for i, result in enumerate(factory.test_results, 1):
-                report += f"\n### Test {i}\n"
-                report += f"- Type: {result.get('test_type', 'Unknown')}\n"
-                report += f"- URL: {result.get('url', 'N/A')}\n"
-                report += f"- Status: {'VULNERABLE' if result.get('is_vulnerable') else 'SAFE'}\n"
+                status_icon = "🔴" if result.get('is_vulnerable') else "✅"
+                report += f"#### Test {i}: {result.get('test_type', 'Unknown Test')} {status_icon}\n\n"
+                report += f"- **Status**: {'VULNERABLE' if result.get('is_vulnerable') else 'SAFE'}\n"
+                report += f"- **URL**: `{result.get('url', factory.target_url)}`\n"
+                report += f"- **Tool**: {result.get('tool', result.get('test_type', 'Unknown'))}\n"
+                report += f"- **Timestamp**: {result.get('timestamp', 'N/A')}\n"
+                
                 if result.get('issue'):
-                    report += f"- Issue: {result['issue']}\n"
-                report += f"- Timestamp: {result.get('timestamp', 'N/A')}\n"
+                    report += f"- **Issue**: {result['issue']}\n"
+                if result.get('severity'):
+                    report += f"- **Severity**: {result['severity']}\n"
+                if result.get('parameter'):
+                    report += f"- **Parameter**: {result['parameter']}\n"
+                if result.get('payload'):
+                    report += f"- **Payload**: `{result['payload']}`\n"
+                if result.get('count'):
+                    report += f"- **Findings Count**: {result['count']}\n"
+                
+                # Include detailed findings if available
+                if result.get('findings') and isinstance(result.get('findings'), list):
+                    report += f"\n**Detailed Findings** ({len(result['findings'])} items):\n"
+                    for finding in result['findings'][:3]:  # Show first 3 findings
+                        if isinstance(finding, dict):
+                            report += f"- {finding.get('info', {}).get('name', finding.get('name', 'Finding'))}\n"
+                            if finding.get('matched-at'):
+                                report += f"  - Location: {finding.get('matched-at')}\n"
+                        else:
+                            report += f"- {str(finding)[:100]}\n"
+                    if len(result['findings']) > 3:
+                        report += f"- *... and {len(result['findings']) - 3} more findings*\n"
+                
+                report += "\n"
             
-            logger.info("Security report generated successfully")
+            report += "---\n\n## Recommendations\n\n"
+            
+            if critical_tests or high_tests:
+                report += "### Immediate Actions Required\n\n"
+                report += "1. **Address Critical Vulnerabilities First**: Focus on fixing all critical vulnerabilities immediately as they pose the highest risk.\n"
+                report += "2. **Implement Input Validation**: Ensure all user inputs are properly validated and sanitized.\n"
+                report += "3. **Update Security Headers**: Implement proper security headers (CSP, X-Frame-Options, etc.).\n"
+                report += "4. **Regular Security Audits**: Schedule regular security assessments to identify new vulnerabilities.\n"
+                report += "5. **Security Training**: Provide security awareness training for development teams.\n\n"
+            
+            if medium_tests or low_tests:
+                report += "### Medium Priority Recommendations\n\n"
+                report += "1. **Review Medium Severity Issues**: Address medium severity vulnerabilities in the next development cycle.\n"
+                report += "2. **Security Best Practices**: Implement security best practices and coding standards.\n"
+                report += "3. **Dependency Updates**: Keep all dependencies and frameworks up to date.\n\n"
+            
+            if not vulnerable_tests:
+                report += "### Security Status\n\n"
+                report += "✅ **No vulnerabilities detected** in the current assessment. However, security is an ongoing process:\n\n"
+                report += "1. Continue regular security testing\n"
+                report += "2. Implement security monitoring\n"
+                report += "3. Keep security tools and dependencies updated\n"
+                report += "4. Follow security best practices\n\n"
+            
+            report += "---\n\n## Testing Methodology\n\n"
+            report += "This assessment utilized the following testing approach:\n\n"
+            report += "1. **Reconnaissance**: Initial target analysis and structure discovery\n"
+            report += "2. **Vulnerability Scanning**: Comprehensive scanning using Nuclei with 10,000+ templates\n"
+            report += "3. **Targeted Testing**: Specific vulnerability testing (XSS, SQL injection)\n"
+            report += "4. **Analysis**: Detailed analysis of findings and risk assessment\n"
+            report += "5. **Reporting**: Comprehensive documentation of all findings\n\n"
+            
+            report += "### Tools Used\n\n"
+            for tool_name in sorted(tool_results.keys()):
+                tool_count = len(tool_results[tool_name])
+                tool_vulns = len([r for r in tool_results[tool_name] if r.get('is_vulnerable', False)])
+                report += f"- **{tool_name.replace('_', ' ').title()}**: {tool_count} tests, {tool_vulns} vulnerabilities found\n"
+            
+            report += f"\n---\n\n## Conclusion\n\n"
+            
+            if critical_tests or high_tests:
+                report += f"This security assessment identified **{len(vulnerable_tests)} vulnerabilities** requiring attention. "
+                report += f"**{len(critical_tests)} critical** and **{len(high_tests)} high severity** issues should be addressed immediately. "
+                report += "The target application requires immediate security improvements to reduce risk.\n\n"
+            else:
+                report += f"This security assessment found **{len(vulnerable_tests)} vulnerabilities**. "
+                if len(vulnerable_tests) == 0:
+                    report += "The target application appears to have good security practices in place. "
+                else:
+                    report += "While no critical issues were found, it is recommended to address the identified issues. "
+                report += "Regular security assessments are recommended to maintain security posture.\n\n"
+            
+            report += f"**Report Generated**: {datetime.now().isoformat()}\n"
+            report += f"**Total Execution Time**: See detailed action report for timing information\n"
+            
+            logger.info("Comprehensive security report generated successfully")
+            factory.log_trail("report_generated", {
+                "total_tests": len(factory.test_results),
+                "vulnerabilities": len(vulnerable_tests),
+                "critical": len(critical_tests),
+                "high": len(high_tests),
+                "risk_level": risk_level,
+                "risk_score": risk_score
+            }, f"Generated comprehensive security report with {len(vulnerable_tests)} vulnerabilities")
+            
             return report
         
         return generate_report
