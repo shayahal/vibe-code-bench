@@ -4,6 +4,7 @@ langchain-openai>=0.0.5
 langchain-anthropic>=0.1.0
 langchain-community>=0.0.20
 openai>=1.12.0
+langfuse
 
 # Environment and HTTP
 python-dotenv>=1.0.0
@@ -14,27 +15,41 @@ httpx>=0.25.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
 
+# Observability and Logging
+langfuse>=2.0.0
+
 # Web Application Security Tools (pip-installable)
 sqlmap>=1.8.0
-xsstrike>=3.1.5
-paramspider>=2.1.0
-arjun>=2.2.0
-wfuzz>=3.1.0
 wapiti3>=3.1.0
 
 # Reconnaissance Tools
-theHarvester>=4.5.0
-
-# Active Directory Tools
-bloodhound>=4.0.0
-crackmapexec>=5.0.0
+# Note: theHarvester versions vary - install manually if needed:
+# pip install theHarvester (or install from GitHub: https://github.com/laramies/theHarvester)
+theHarvester
 
 # Cloud Security Tools
-pacu>=1.0.0
 scoutsuite>=5.0.0
 
-# API Security Tools
-rest-attacker>=1.0.0
+# ============================================================================
+# NOTE: The following tools are NOT pip-installable and must be installed separately:
+# ============================================================================
+#
+# Python-based Tools (install from GitHub):
+# - paramspider: git clone https://github.com/devanshbatham/ParamSpider.git
+# - xsstrike: git clone https://github.com/s0md3v/XSStrike.git
+# - arjun: pip install arjun (if available) or git clone https://github.com/s0md3v/Arjun.git
+# - wfuzz: pip install wfuzz (if available) or install from source
+#
+# Active Directory Tools:
+# - bloodhound: pip install bloodhound (if available) or install from GitHub
+# - crackmapexec: pip install crackmapexec (if available) or install from GitHub
+#
+# Cloud Security Tools:
+# - pacu: git clone https://github.com/RhinoSecurityLabs/pacu.git
+#
+# API Security Tools:
+# - rest-attacker: Install from GitHub or check for pip package availability
+#
 
 # ============================================================================
 # NOTE: The following SOTA tools are NOT pip-installable and must be installed separately:
