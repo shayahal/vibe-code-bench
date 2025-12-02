@@ -103,24 +103,28 @@ def test_xss_patterns(url: str, form_data: Optional[Dict[str, Any]] = None) -> s
         except Exception as e:
             findings.append(f"Could not analyze page structure: {str(e)}")
         
-        # Build report
-        report = f"XSS Vulnerability Testing for {url}\n"
-        report += "=" * 60 + "\n\n"
+        # Build concise report
+        report_parts = []
         
         if vulnerabilities:
-            report += "⚠ POTENTIAL XSS VULNERABILITIES FOUND:\n"
-            for vuln in vulnerabilities:
-                report += f"  {vuln}\n"
-            report += "\n"
+            report_parts.append(f"XSS Testing for {url}: ⚠ POTENTIAL VULNERABILITIES FOUND")
+            report_parts.extend([f"  {vuln}" for vuln in vulnerabilities[:5]])  # Limit to 5 vulnerabilities
+            if len(vulnerabilities) > 5:
+                report_parts.append(f"  ... and {len(vulnerabilities) - 5} more")
         else:
-            report += "✓ No obvious XSS vulnerabilities detected in tested parameters\n\n"
+            report_parts.append(f"XSS Testing for {url}: ✓ No obvious XSS vulnerabilities detected")
         
         if findings:
-            report += "ANALYSIS FINDINGS:\n"
-            for finding in findings:
-                report += f"  • {finding}\n"
+            report_parts.append("\nFindings:")
+            report_parts.extend([f"  • {f}" for f in findings[:3]])  # Limit to 3 findings
+            if len(findings) > 3:
+                report_parts.append(f"  ... and {len(findings) - 3} more")
         
-        report += "\nNote: This is a basic test. Manual verification recommended for any potential vulnerabilities."
+        report = "\n".join(report_parts)
+        
+        # Limit output length to prevent context bloat
+        if len(report) > 500:
+            report = report[:500] + f"\n[Truncated - {len(report)} chars total]"
         
         return report
         
