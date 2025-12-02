@@ -3,14 +3,14 @@
 ## Current State
 
 ### Project Phase
-**Status**: [START / RIPER]
+**Status**: [Development / Testing / Production]
 **Current Step**: [Which step/phase]
 **Started**: [Date/Time]
 
 ---
 
-### RIPER Workflow State
-**Current Phase**: [Research / Innovate / Plan / Execute / Review]
+### Development Workflow State
+**Current Phase**: [Research / Design / Implement / Test / Review]
 **Previous Phase**: [Previous phase]
 **Next Phase**: [Next phase]
 **Phase Started**: [Date/Time]
@@ -81,20 +81,20 @@ If interrupted:
 
 ## Example States
 
-### START Phase State
+### Development Phase State
 ```
-Project Phase: START
-Current Step: Architecture
+Project Phase: Development
+Current Step: Implementation
 Started: 2025-01-15 10:00
-Active Tasks: Designing system architecture
+Active Tasks: Implementing security testing features
 Blockers: None
 ```
 
-### RIPER Workflow State
+### Workflow State
 ```
-Current Phase: Execute
-Previous Phase: Plan
-Next Phase: Review
+Current Phase: Implement
+Previous Phase: Design
+Next Phase: Test
 Phase Started: 2025-01-15 14:30
 Current Task: Implementing logging system
 Task Status: In Progress

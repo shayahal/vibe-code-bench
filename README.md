@@ -1,24 +1,6 @@
 # vibe-code-bench
 Benchmark for the security of vibe coded apps
 
-## CursorRIPER Framework
-
-This project uses the [CursorRIPER Framework](https://github.com/johnpeterman72/CursorRIPER) for structured AI-assisted development. The framework provides:
-
-- **Structured Workflow**: START phase for initialization, RIPER workflow for development
-- **Memory Bank**: Persistent knowledge across coding sessions
-- **State Management**: Track current development phase and tasks
-- **Decision Logging**: Document important decisions and rationale
-
-### Quick Start with CursorRIPER
-
-1. **Initialize Project**: Use `/start` command in Cursor
-2. **Begin Development**: Use `/riper` command to enter RIPER workflow
-3. **Track State**: Use `/state` command to see current status
-4. **Manage Memory**: Use `/memory` command to access knowledge base
-
-See `.cursor/README.mdc` for complete framework documentation.
-
 ---
 
 ## LangChain Red-Teaming Agent for Web Security

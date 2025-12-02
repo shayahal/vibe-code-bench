@@ -61,20 +61,6 @@
 
 ---
 
-### 2025-01-15: CursorRIPER Framework Integration
-**Decision**: Integrate CursorRIPER framework for structured development
-**Rationale**:
-- Structured workflow
-- Persistent memory
-- State management
-- Continuity across sessions
-**Alternatives Considered**:
-- Ad-hoc development (less organized)
-**Impact**: Development workflow, project organization
-**Status**: In Progress
-
----
-
 ## Decision Template
 
 ```
