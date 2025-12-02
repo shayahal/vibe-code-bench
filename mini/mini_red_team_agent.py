@@ -198,29 +198,7 @@ def main():
         else:
             output = str(result)
         
-        # Wait a moment for LangFuse to process the trace
-        time.sleep(2)
-        
-        # Flush both the handler's client and the main client to ensure data is sent
-        # This is critical for short-lived scripts to ensure traces are sent
-        try:
-            if hasattr(langfuse_handler, 'langfuse') and langfuse_handler.langfuse:
-                langfuse_handler.langfuse.flush()
-                # Also try shutdown for complete flush
-                if hasattr(langfuse_handler.langfuse, 'shutdown'):
-                    langfuse_handler.langfuse.shutdown()
-        except Exception as e:
-            print(f"  Warning: Error flushing handler: {e}")
-        
-        try:
-            langfuse_client.flush()
-            # Also try shutdown for complete flush
-            if hasattr(langfuse_client, 'shutdown'):
-                langfuse_client.shutdown()
-        except Exception as e:
-            print(f"  Warning: Error flushing client: {e}")
-        
-        # Try to extract trace ID for verification
+        # Extract trace ID before flushing (in case it gets cleared)
         trace_id = None
         try:
             # The handler has a last_trace_id attribute that contains the trace ID
@@ -233,8 +211,41 @@ def main():
         except Exception as e:
             pass  # Trace ID extraction is optional
         
-        # Wait a bit longer for async processing
-        time.sleep(3)
+        # Wait a moment for LangFuse to process the trace
+        time.sleep(2)
+        
+        # Flush both the handler's client and the main client to ensure data is sent
+        # This is critical for short-lived scripts to ensure traces are sent
+        flush_success = False
+        try:
+            if hasattr(langfuse_handler, 'langfuse') and langfuse_handler.langfuse:
+                langfuse_handler.langfuse.flush()
+                flush_success = True
+        except Exception as e:
+            print(f"  Warning: Error flushing handler: {e}")
+        
+        try:
+            langfuse_client.flush()
+            flush_success = True
+        except Exception as e:
+            print(f"  Warning: Error flushing client: {e}")
+        
+        # Wait longer for async processing and ensure data is sent
+        if flush_success:
+            time.sleep(5)  # Increased wait time for LangFuse to process
+        else:
+            print("  Warning: Flush may have failed - trace might not be available immediately")
+        
+        # Try to verify trace exists (optional - may not always work)
+        if trace_id:
+            try:
+                # Try to fetch the trace to verify it exists
+                trace = langfuse_client.trace(id=trace_id)
+                if trace:
+                    print(f"  ✓ Trace verified in LangFuse")
+            except Exception:
+                # Trace might not be immediately available, that's okay
+                pass
         
         # Generate report using the agent
         report = generate_run_report(
@@ -261,6 +272,10 @@ def main():
         print(f"  - Check your LangFuse dashboard: {langfuse_host}")
         if trace_id:
             print(f"  - Trace ID: {trace_id}")
+            print(f"  - Direct Trace Link: {langfuse_host}/traces/{trace_id}")
+            print(f"  Note: Traces may take a few seconds to appear in the dashboard")
+        else:
+            print(f"  Note: Trace ID not available - check dashboard for recent traces")
         print(f"\n✓ Run report generated: {report_file}")
         
     except Exception as e:

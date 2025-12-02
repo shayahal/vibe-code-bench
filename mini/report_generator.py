@@ -5,8 +5,9 @@ Generates comprehensive run reports using LLM based on execution data.
 """
 
 import os
+import re
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Set
 
 if TYPE_CHECKING:
     from langchain_anthropic import ChatAnthropic
@@ -57,9 +58,112 @@ Ethical Guidelines:
 Always think step by step and document your findings as you test. Choose tools strategically - you don't need to use all tools, only the ones relevant to your testing."""
 
 
+def deduplicate_output(output: str) -> str:
+    """
+    Remove duplicate information from agent output.
+    
+    Args:
+        output: The agent's output string
+        
+    Returns:
+        Deduplicated output string
+    """
+    if not output:
+        return output
+    
+    lines = output.split('\n')
+    seen: Set[str] = set()
+    deduplicated_lines: List[str] = []
+    
+    for line in lines:
+        # Normalize line for comparison (lowercase, strip whitespace)
+        normalized = line.strip().lower()
+        
+        # Skip empty lines and very short lines
+        if not normalized or len(normalized) < 10:
+            deduplicated_lines.append(line)
+            continue
+        
+        # Check for duplicate content (similarity check)
+        is_duplicate = False
+        for seen_line in seen:
+            # Check if this line is very similar to a seen line
+            if normalized in seen_line or seen_line in normalized:
+                # If one is a substring of the other, it's likely a duplicate
+                if abs(len(normalized) - len(seen_line)) < len(normalized) * 0.3:
+                    is_duplicate = True
+                    break
+        
+        if not is_duplicate:
+            seen.add(normalized)
+            deduplicated_lines.append(line)
+    
+    return '\n'.join(deduplicated_lines)
+
+
+def deduplicate_report(report_content: str) -> str:
+    """
+    Remove duplicate sections and lines from generated report.
+    
+    Args:
+        report_content: The generated report content
+        
+    Returns:
+        Deduplicated report content
+    """
+    if not report_content:
+        return report_content
+    
+    lines = report_content.split('\n')
+    seen_vulns: Set[str] = set()
+    seen_recommendations: Set[str] = set()
+    deduplicated_lines: List[str] = []
+    
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        
+        # Extract vulnerability IDs to detect duplicates
+        vuln_match = re.search(r'\*\*VULN-(\d+)\*\*', line, re.IGNORECASE)
+        if vuln_match:
+            vuln_id = vuln_match.group(1)
+            if vuln_id in seen_vulns:
+                # Skip this duplicate vulnerability
+                i += 1
+                continue
+            seen_vulns.add(vuln_id)
+        
+        # Extract recommendations to detect duplicates
+        is_duplicate_rec = False
+        if 'recommendation' in line.lower() or 'fix:' in line.lower():
+            normalized_rec = line.strip().lower()
+            # Remove common prefixes for comparison
+            normalized_rec = re.sub(r'^[-*•]\s*', '', normalized_rec)
+            normalized_rec = re.sub(r'\*\*fix:\*\*', '', normalized_rec).strip()
+            
+            if normalized_rec and len(normalized_rec) > 10:
+                # Check if this recommendation is similar to one we've seen
+                for seen_rec in seen_recommendations:
+                    if normalized_rec in seen_rec or seen_rec in normalized_rec:
+                        if abs(len(normalized_rec) - len(seen_rec)) < len(normalized_rec) * 0.4:
+                            is_duplicate_rec = True
+                            break
+                
+                if not is_duplicate_rec:
+                    seen_recommendations.add(normalized_rec)
+        
+        # Skip duplicate recommendations, but add everything else
+        if not is_duplicate_rec:
+            deduplicated_lines.append(line)
+        
+        i += 1
+    
+    return '\n'.join(deduplicated_lines)
+
+
 def get_report_generation_prompt(url: str, output: str, execution_time: float) -> str:
     """
-    Get the prompt for generating a vulnerability-focused security report.
+    Get the prompt for generating a concise vulnerability-focused security report.
     
     Args:
         url: The URL that was tested
@@ -69,94 +173,39 @@ def get_report_generation_prompt(url: str, output: str, execution_time: float) -
     Returns:
         Formatted prompt string
     """
-    return f"""You are generating a security assessment report focused on VULNERABILITIES FOUND.
+    return f"""Generate a CONCISE security assessment report. Be brief and focus on key findings only.
 
 Target URL: {url}
 Assessment Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-Assessment Duration: {execution_time:.2f} seconds
+Duration: {execution_time:.2f} seconds
 
-Agent Output (contains tool results and findings):
+Agent Output:
 {output}
 
-CRITICAL: Extract and organize ALL vulnerabilities and security issues from the agent output above.
+Generate a SHORT report with this structure:
 
-Generate a vulnerability-focused security report with this structure:
+## Summary
+- Vulnerabilities: [Critical/High/Medium/Low counts]
+- Risk Level: [Critical/High/Medium/Low]
+- Key Issues: [1-2 sentence summary]
 
-## 1. Executive Summary
-- Target URL: {url}
-- Assessment Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-- Total Vulnerabilities Found: [count by severity]
-  - Critical: [count]
-  - High: [count]
-  - Medium: [count]
-  - Low: [count]
-- Overall Risk Level: [Critical/High/Medium/Low]
-- Key Findings: 2-3 sentence summary of the most critical issues
+## Vulnerabilities
 
-## 2. Vulnerabilities by Severity
+For each vulnerability, use this format:
+- **VULN-XXX**: [Title] - [Brief description]. **Fix:** [One-line recommendation]
 
-### 2.1 Critical Vulnerabilities
-For EACH critical vulnerability found, include:
-- **VULN-XXX**: [Title]
-  - **Severity**: CRITICAL
-  - **Description**: What the vulnerability is
-  - **Affected Resource**: URL/endpoint/header/etc.
-  - **Evidence**: What was found (specific details from tool output)
-  - **Impact**: What an attacker could exploit
-  - **Recommendation**: How to fix it
+Group by severity (Critical, High, Medium, Low). Only include vulnerabilities found.
 
-### 2.2 High Severity Vulnerabilities
-(Same format as Critical)
-
-### 2.3 Medium Severity Vulnerabilities
-(Same format as Critical)
-
-### 2.4 Low Severity Vulnerabilities
-(Same format as Critical)
-
-## 3. Security Findings by Category
-
-### 3.1 Security Headers Analysis
-- Summary of headers checked
-- Missing or misconfigured headers found
-- Specific issues identified
-- Recommendations
-
-### 3.2 XSS Vulnerability Testing
-- Parameters/fields tested
-- Vulnerabilities found (if any)
-- Evidence (payloads, responses)
-- Recommendations
-
-### 3.3 SQL Injection Testing
-- Parameters/fields tested
-- Vulnerabilities found (if any)
-- Evidence (payloads, error messages)
-- Recommendations
-
-### 3.4 Authentication Analysis
-- Authentication mechanisms found
-- Security issues identified
-- Session management issues
-- Recommendations
-
-## 4. Testing Methodology
-- Tools used during assessment
-- Tests performed
-- Scope and limitations
-
-## 5. Recommendations Summary
-- Prioritized list of fixes (Critical first)
-- Quick wins
-- Long-term security improvements
+## Recommendations
+- Prioritized list of fixes (one line each)
 
 IMPORTANT:
-- Extract ALL vulnerabilities from the agent output
-- Organize by severity (CRITICAL, HIGH, MEDIUM, LOW)
-- Include specific evidence and details
-- If NO vulnerabilities found, clearly state that
-- Focus on actionable findings, not generic descriptions
-- Use the exact tool output data provided above"""
+- Keep it SHORT - maximum 50 lines total
+- Only include actual vulnerabilities found
+- Use bullet points, avoid verbose explanations
+- DO NOT repeat the same vulnerability multiple times - each vulnerability should appear only once
+- DO NOT duplicate recommendations - each recommendation should appear only once
+- If no vulnerabilities found, state "No vulnerabilities detected" and skip sections"""
 
 
 def generate_run_report(
@@ -193,21 +242,23 @@ def generate_run_report(
         except:
             pass
         
+        # Deduplicate agent output before generating report
+        deduplicated_output = deduplicate_output(output)
+        
         # Get report generation prompt
-        report_prompt = get_report_generation_prompt(url, output, execution_time)
+        report_prompt = get_report_generation_prompt(url, deduplicated_output, execution_time)
         
         # Generate report using LLM
         report_response = llm.invoke(report_prompt)
         report_content = report_response.content if hasattr(report_response, 'content') else str(report_response)
         
+        # Deduplicate the generated report content
+        report_content = deduplicate_report(report_content)
+        
         # Add header and metadata
-        full_report = f"""# Security Assessment Report - Vulnerability Focused
+        full_report = f"""# Security Assessment Report
 
-**Target URL:** {url}  
-**Assessment Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Assessment Duration:** {execution_time:.2f} seconds  
-**Assessment Type:** Automated Security Testing  
-**Model:** claude-3-haiku-20240307
+**Target:** {url} | **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | **Duration:** {execution_time:.2f}s
 
 ---
 
@@ -215,17 +266,9 @@ def generate_run_report(
 
 ---
 
-## Technical Details
-
-- **Trace ID:** {trace_id if trace_id else 'Available in LangFuse dashboard'}
-- **LangFuse Dashboard:** Check {os.getenv('LANGFUSE_HOST', 'https://cloud.langfuse.com')} for detailed traces
-{f'- **Direct Trace Link:** {os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")}/traces/{trace_id}' if trace_id else ''}
-- **All observability data** (tokens, costs, detailed traces) is available in LangFuse
-
----
-
-**Note:** This report focuses on vulnerabilities and security issues found during automated testing. 
-For comprehensive security evaluation, manual penetration testing is recommended.
+**Trace ID:** {trace_id if trace_id else 'Available in LangFuse dashboard'}  
+**Dashboard:** {os.getenv('LANGFUSE_HOST', 'https://cloud.langfuse.com')}
+{f'**Trace Link:** {os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")}/traces/{trace_id}' if trace_id else ''}
 """
         
         return full_report
