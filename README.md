@@ -5,7 +5,7 @@ Benchmark for the security of vibe coded apps
 
 ## Red Team Agent
 
-A lightweight, focused LangChain-based agent for automated web security testing. The red team agent performs comprehensive security assessments using a curated set of security testing tools, powered by Claude Mini (anthropic/claude-3-haiku) via OpenRouter.
+A lightweight, focused LangChain-based agent for automated web security testing. The red team agent performs comprehensive security assessments using a curated set of security testing tools, powered by Claude Haiku (anthropic/claude-3-haiku) via OpenRouter.
 
 ### Features
 
@@ -35,7 +35,7 @@ A lightweight, focused LangChain-based agent for automated web security testing.
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │         LLM Agent (Claude Mini via OpenRouter)           │  │
+│  │         LLM Agent (Claude Haiku via OpenRouter)          │  │
 │  │         Intelligent tool selection and orchestration      │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
@@ -142,7 +142,7 @@ pip install -r requirements.txt
 Create a `.env` file in the project root:
 
 ```bash
-# Required: OpenRouter API key (for Claude Mini)
+# Required: OpenRouter API key (for Claude Haiku)
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # Required: LangFuse credentials (for observability)
@@ -166,21 +166,41 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 #### Basic Security Assessment
 
 ```bash
-python mini/red_team_agent.py --url https://example.com
+python red_team_agent/red_team_agent.py --url https://example.com
 ```
 
-#### With Custom API Key
+#### With Custom Model
 
 ```bash
-python mini/red_team_agent.py \
+# Use GPT-4
+python red_team_agent/red_team_agent.py \
   --url https://example.com \
-  --api-key your_openrouter_api_key
+  --model openai/gpt-4
+
+# Use Claude Opus
+python red_team_agent/red_team_agent.py \
+  --url https://example.com \
+  --model anthropic/claude-3-opus
+
+# Use Gemini Pro
+python red_team_agent/red_team_agent.py \
+  --url https://example.com \
+  --model google/gemini-pro
+```
+
+#### With Custom API Key and Model
+
+```bash
+python red_team_agent/red_team_agent.py \
+  --url https://example.com \
+  --api-key your_openrouter_api_key \
+  --model openai/gpt-4
 ```
 
 ### Programmatic Usage
 
 ```python
-from mini.red_team_agent import main
+from red_team_agent.red_team_agent import main
 import sys
 
 # Set up arguments
@@ -202,6 +222,7 @@ The agent generates comprehensive security reports in Markdown format:
 └─────────────────────────────────────────────────────────────┘
 
 1. Executive Summary
+   ├─ Model used for assessment
    ├─ Total tests performed
    ├─ Vulnerabilities found
    ├─ Risk level assessment
@@ -225,7 +246,7 @@ The agent generates comprehensive security reports in Markdown format:
 
 ### Report Location
 
-- Reports are saved in `mini/reports/run_report_YYYYMMDD_HHMMSS.md`
+- Reports are saved in `red_team_agent/reports/run_report_YYYYMMDD_HHMMSS.md`
 - Each run generates a timestamped report file
 
 ### LangFuse Observability
@@ -254,11 +275,22 @@ Access your traces at: https://cloud.langfuse.com
 
 ### Model Configuration
 
-The agent uses:
-- **Model**: `anthropic/claude-3-haiku` (Claude Mini)
+The agent supports any model available on OpenRouter. You can choose the model using the `--model` argument:
+
+- **Default Model**: `anthropic/claude-3-haiku` (Claude Haiku)
 - **Provider**: OpenRouter
 - **Temperature**: 0.7
 - **Max Tokens**: 2000
+
+**Popular Model Options:**
+- `anthropic/claude-3-haiku` - Fast and cost-effective (default)
+- `anthropic/claude-3-opus` - Most capable, slower
+- `openai/gpt-4` - High quality, versatile
+- `openai/gpt-3.5-turbo` - Fast and affordable
+- `google/gemini-pro` - Google's advanced model
+- `meta-llama/llama-3-70b-instruct` - Open source alternative
+
+See all available models at: https://openrouter.ai/models
 
 ---
 
@@ -267,7 +299,7 @@ The agent uses:
 Run the test suite:
 
 ```bash
-pytest mini/test_mini_agent.py -v
+pytest red_team_agent/test_mini_agent.py -v
 ```
 
 Tests cover:
@@ -370,9 +402,9 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 To add a new security testing tool:
 
-1. **Create tool module** in `mini/tools/`:
+1. **Create tool module** in `red_team_agent/tools/`:
    ```python
-   # mini/tools/new_tool.py
+   # red_team_agent/tools/new_tool.py
    def test_new_vulnerability(url: str) -> str:
        # Tool implementation
        pass
@@ -385,16 +417,16 @@ To add a new security testing tool:
        )
    ```
 
-2. **Register tool** in `mini/tools/__init__.py`:
+2. **Register tool** in `red_team_agent/tools/__init__.py`:
    ```python
    from .new_tool import test_new_vulnerability, get_new_tool
    
    TOOLS_REGISTRY["test_new_vulnerability"] = get_new_tool
    ```
 
-3. **Update prompt** in `mini/red_team_prompt.py` to include the new tool
+3. **Update prompt** in `red_team_agent/red_team_prompt.py` to include the new tool
 
-4. **Add tests** in `mini/test_mini_agent.py`
+4. **Add tests** in `red_team_agent/test_mini_agent.py`
 
 ---
 
@@ -408,7 +440,7 @@ To add a new security testing tool:
 
 This project uses:
 - [LangChain](https://www.langchain.com/) - LLM application framework
-- [Claude Mini (Haiku)](https://www.anthropic.com/) - Fast, efficient LLM via OpenRouter
+- [Claude Haiku](https://www.anthropic.com/) - Fast, efficient LLM via OpenRouter
 - [LangFuse](https://langfuse.com/) - Observability and monitoring
 - [OpenRouter](https://openrouter.ai/) - Unified API for LLMs
 

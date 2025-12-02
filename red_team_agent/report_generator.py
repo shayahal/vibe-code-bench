@@ -215,7 +215,8 @@ def generate_run_report(
     output: str,
     execution_time: float,
     langfuse_handler: "LangfuseCallbackHandler",
-    run_id: str = None
+    run_id: str = None,
+    model_name: str = "anthropic/claude-3-haiku"
 ) -> str:
     """
     Generate a run report using the LLM based on LangFuse trace data.
@@ -260,7 +261,7 @@ def generate_run_report(
         run_id_section = f"**Run ID:** {run_id}\n" if run_id else ""
         full_report = f"""# Security Assessment Report
 
-**Target:** {url} | **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | **Duration:** {execution_time:.2f}s
+**Target:** {url} | **Model:** {model_name} | **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | **Duration:** {execution_time:.2f}s
 {run_id_section}
 ---
 
@@ -284,8 +285,8 @@ def generate_run_report(
 
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
 **Target URL:** {url}  
+**Model:** {model_name}
 **Execution Time:** {execution_time:.2f} seconds  
-**Model:** claude-3-haiku-20240307
 
 ## Summary
 
@@ -298,11 +299,11 @@ The agent successfully browsed the URL {url} and extracted the first 3 lines of 
 ## Execution Details
 
 - **Total execution time:** {execution_time:.2f} seconds
-- **Model:** claude-3-haiku-20240307 (Claude Mini)
+- **Model:** {model_name}
 
 ## Cost Analysis
 
-- **Model:** claude-3-haiku-20240307
+- **Model:** {model_name}
 - **Cost:** Check LangFuse dashboard for detailed cost breakdown
 - **Token usage:** Available in LangFuse trace data
 
