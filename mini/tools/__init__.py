@@ -1,12 +1,39 @@
 """
-Mini Red Team Agent Tools Package
+Red Team Agent Tools Package
 
-This package contains all tools for the mini red team agent.
+This package contains all tools for the red team agent.
 Each tool is in its own module, and the registry maps tool names to their functions.
 """
 
 from typing import Dict, Callable, List
 from langchain_core.tools import StructuredTool
+
+
+def truncate_output(output: str, max_length: int = 500) -> str:
+    """
+    Truncate tool output to prevent context bloat.
+    
+    Args:
+        output: The tool output string
+        max_length: Maximum length in characters (default: 500)
+        
+    Returns:
+        Truncated output with ellipsis if needed
+    """
+    if len(output) <= max_length:
+        return output
+    
+    # Try to truncate at a sentence boundary
+    truncated = output[:max_length]
+    last_period = truncated.rfind('.')
+    last_newline = truncated.rfind('\n')
+    
+    # Use the later of period or newline for clean truncation
+    cut_point = max(last_period, last_newline)
+    if cut_point > max_length * 0.7:  # Only use if it's not too early
+        truncated = truncated[:cut_point + 1]
+    
+    return truncated + f"\n\n[Output truncated - original length: {len(output)} chars]"
 
 # Import tool functions
 from .browse_tool import browse_url, get_browse_tool

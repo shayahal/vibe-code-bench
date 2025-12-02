@@ -1,5 +1,5 @@
 """
-Report Generator for Mini Red Team Agent
+Report Generator for Red Team Agent
 
 Generates comprehensive run reports using LLM based on execution data.
 """
@@ -214,7 +214,8 @@ def generate_run_report(
     url: str,
     output: str,
     execution_time: float,
-    langfuse_handler: "LangfuseCallbackHandler"
+    langfuse_handler: "LangfuseCallbackHandler",
+    run_id: str = None
 ) -> str:
     """
     Generate a run report using the LLM based on LangFuse trace data.
@@ -256,19 +257,23 @@ def generate_run_report(
         report_content = deduplicate_report(report_content)
         
         # Add header and metadata
+        run_id_section = f"**Run ID:** {run_id}\n" if run_id else ""
         full_report = f"""# Security Assessment Report
 
 **Target:** {url} | **Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | **Duration:** {execution_time:.2f}s
-
+{run_id_section}
 ---
 
 {report_content}
 
 ---
 
+**Run ID:** {run_id if run_id else 'N/A'} (use this to filter traces in LangFuse)  
 **Trace ID:** {trace_id if trace_id else 'Available in LangFuse dashboard'}  
 **Dashboard:** {os.getenv('LANGFUSE_HOST', 'https://cloud.langfuse.com')}
 {f'**Trace Link:** {os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")}/traces/{trace_id}' if trace_id else ''}
+
+**Note:** Search for "run_id: {run_id}" in LangFuse to find all traces for this run.
 """
         
         return full_report

@@ -108,22 +108,26 @@ def analyze_authentication(url: str) -> str:
         else:
             issues.append("MEDIUM: No CSRF token fields detected - CSRF protection may be missing")
         
-        # Build report
-        report = f"Authentication Analysis for {url}\n"
-        report += "=" * 60 + "\n\n"
-        
-        if findings:
-            report += "FINDINGS:\n"
-            for finding in findings:
-                report += f"  • {finding}\n"
-            report += "\n"
+        # Build concise report (focus on issues)
+        report_parts = []
         
         if issues:
-            report += "SECURITY ISSUES:\n"
-            for issue in issues:
-                report += f"  ⚠ {issue}\n"
+            report_parts.append(f"Authentication Analysis for {url}: SECURITY ISSUES FOUND")
+            report_parts.extend([f"  ⚠ {issue}" for issue in issues[:5]])  # Limit to 5 issues
+            if len(issues) > 5:
+                report_parts.append(f"  ... and {len(issues) - 5} more")
+            if findings:
+                report_parts.append(f"\nFindings: {len(findings)} items")
         else:
-            report += "✓ No obvious authentication security issues detected\n"
+            report_parts.append(f"Authentication Analysis for {url}: ✓ No obvious security issues detected")
+            if findings:
+                report_parts.append(f"Findings: {len(findings)} items")
+        
+        report = "\n".join(report_parts)
+        
+        # Limit output length to prevent context bloat
+        if len(report) > 500:
+            report = report[:500] + f"\n[Truncated - {len(report)} chars total]"
         
         return report
         

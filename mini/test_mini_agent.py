@@ -1,5 +1,5 @@
 """
-Tests for Mini Red Team Agent
+Tests for Red Team Agent
 
 Tests cover:
 - Browse tool functionality
@@ -301,12 +301,12 @@ class TestReportGenerator:
         assert "Available in LangFuse dashboard" in report or "Trace ID" in report
 
 
-class TestMiniRedTeamAgent:
-    """Tests for the main mini red team agent."""
+class TestRedTeamAgent:
+    """Tests for the main red team agent."""
     
-    @patch('mini_red_team_agent.Langfuse')
-    @patch('mini_red_team_agent.LangfuseCallbackHandler')
-    @patch('mini_red_team_agent.ChatAnthropic')
+    @patch('red_team_agent.Langfuse')
+    @patch('red_team_agent.LangfuseCallbackHandler')
+    @patch('red_team_agent.ChatOpenAI')
     @patch('langchain.agents.create_agent')
     @patch('report_generator.generate_run_report')
     @patch.dict(os.environ, {
@@ -346,10 +346,10 @@ class TestMiniRedTeamAgent:
         # Mock time.sleep and time.time to speed up tests
         # time.time is called multiple times, so we need to provide enough values
         time_values = [0.0, 1.5, 1.5, 1.5, 1.5]  # start_time, end_time, and any other calls
-        with patch('mini_red_team_agent.time.sleep'):
-            with patch('mini_red_team_agent.time.time', side_effect=time_values):
-                with patch('mini_red_team_agent.sys.argv', ['mini_red_team_agent.py', '--url', 'https://example.com']):
-                    with patch('mini_red_team_agent.Path') as mock_path_class:
+        with patch('red_team_agent.time.sleep'):
+            with patch('red_team_agent.time.time', side_effect=time_values):
+                with patch('red_team_agent.sys.argv', ['red_team_agent.py', '--url', 'https://example.com']):
+                    with patch('red_team_agent.Path') as mock_path_class:
                         # Create a proper mock for Path that supports division
                         mock_report_dir = MagicMock()
                         mock_report_file = MagicMock()
@@ -365,16 +365,16 @@ class TestMiniRedTeamAgent:
                         
                         # Import here to avoid import-time issues
                         import importlib
-                        import mini_red_team_agent
-                        importlib.reload(mini_red_team_agent)
-                        mini_red_team_agent.main()
+                        import red_team_agent
+                        importlib.reload(red_team_agent)
+                        red_team_agent.main()
         
         # Verify agent was created and invoked
         mock_create_agent.assert_called_once()
         mock_agent_instance.invoke.assert_called_once()
         mock_generate_report.assert_called_once()
     
-    @patch('mini_red_team_agent.os.getenv')
+    @patch('red_team_agent.os.getenv')
     def test_main_missing_env_vars(self, mock_getenv):
         """Test main with missing environment variables."""
         # Make getenv return None for LangFuse keys
@@ -385,26 +385,26 @@ class TestMiniRedTeamAgent:
             return os.environ.get(key, default)
         mock_getenv.side_effect = getenv_side_effect
         
-        with patch('mini_red_team_agent.sys.argv', ['mini_red_team_agent.py', '--url', 'https://example.com']):
-            with patch('mini_red_team_agent.sys.exit') as mock_exit:
+        with patch('red_team_agent.sys.argv', ['red_team_agent.py', '--url', 'https://example.com']):
+            with patch('red_team_agent.sys.exit') as mock_exit:
                 import importlib
-                import mini_red_team_agent
-                importlib.reload(mini_red_team_agent)
+                import red_team_agent
+                importlib.reload(red_team_agent)
                 try:
-                    mini_red_team_agent.main()
+                    red_team_agent.main()
                 except SystemExit:
                     pass  # Expected
                 # Should exit because LangFuse credentials are missing
                 assert mock_exit.called, "sys.exit should have been called due to missing LangFuse credentials"
     
-    @patch('mini_red_team_agent.os.getenv')
-    @patch('mini_red_team_agent.Langfuse')
-    @patch('mini_red_team_agent.LangfuseCallbackHandler')
+    @patch('red_team_agent.os.getenv')
+    @patch('red_team_agent.Langfuse')
+    @patch('red_team_agent.LangfuseCallbackHandler')
     def test_main_missing_api_key(self, mock_handler_class, mock_langfuse, mock_getenv):
         """Test main with missing API key."""
         # Make getenv return values for LangFuse but None for API key
         def getenv_side_effect(key, default=None):
-            if key == 'ANTHROPIC_API_KEY':
+            if key == 'OPENROUTER_API_KEY':
                 return None
             elif key == 'LANGFUSE_SECRET_KEY':
                 return 'test-secret'
@@ -422,31 +422,31 @@ class TestMiniRedTeamAgent:
         mock_handler_instance = Mock()
         mock_handler_class.return_value = mock_handler_instance
         
-        with patch('mini_red_team_agent.sys.argv', ['mini_red_team_agent.py', '--url', 'https://example.com']):
-            with patch('mini_red_team_agent.sys.exit') as mock_exit:
+        with patch('red_team_agent.sys.argv', ['red_team_agent.py', '--url', 'https://example.com']):
+            with patch('red_team_agent.sys.exit') as mock_exit:
                 import importlib
-                import mini_red_team_agent
-                importlib.reload(mini_red_team_agent)
+                import red_team_agent
+                importlib.reload(red_team_agent)
                 try:
-                    mini_red_team_agent.main()
+                    red_team_agent.main()
                 except SystemExit:
                     pass  # Expected
                 # Should exit because API key is missing
                 assert mock_exit.called, "sys.exit should have been called due to missing API key"
     
-    @patch('mini_red_team_agent.Langfuse')
-    @patch('mini_red_team_agent.LangfuseCallbackHandler')
-    @patch('mini_red_team_agent.ChatAnthropic')
+    @patch('red_team_agent.Langfuse')
+    @patch('red_team_agent.LangfuseCallbackHandler')
+    @patch('red_team_agent.ChatOpenAI')
     @patch('langchain.agents.create_agent')
     @patch('tools.browse_url')
     @patch('report_generator.generate_run_report')
     @patch.dict(os.environ, {
-        'ANTHROPIC_API_KEY': 'test-key',
+        'OPENROUTER_API_KEY': 'test-key',
         'LANGFUSE_SECRET_KEY': 'test-secret',
         'LANGFUSE_PUBLIC_KEY': 'test-public'
     })
     def test_main_agent_error_fallback(self, mock_generate_report, mock_browse_url,
-                                        mock_create_agent, mock_chat_anthropic,
+                                        mock_create_agent, mock_chat_openai,
                                         mock_handler_class, mock_langfuse):
         """Test main with agent error triggering fallback."""
         # Mock LangFuse
@@ -480,10 +480,10 @@ class TestMiniRedTeamAgent:
         
         # time.time is called multiple times, so we need to provide enough values
         time_values = [0.0, 1.0, 1.0, 1.0, 1.0]  # start_time, end_time, and any other calls
-        with patch('mini_red_team_agent.time.sleep'):
-            with patch('mini_red_team_agent.time.time', side_effect=time_values):
-                with patch('mini_red_team_agent.sys.argv', ['mini_red_team_agent.py', '--url', 'https://example.com']):
-                    with patch('mini_red_team_agent.Path') as mock_path_class:
+        with patch('red_team_agent.time.sleep'):
+            with patch('red_team_agent.time.time', side_effect=time_values):
+                with patch('red_team_agent.sys.argv', ['red_team_agent.py', '--url', 'https://example.com']):
+                    with patch('red_team_agent.Path') as mock_path_class:
                         # Create a proper mock for Path that supports division
                         mock_report_dir = MagicMock()
                         mock_report_file = MagicMock()
@@ -493,9 +493,9 @@ class TestMiniRedTeamAgent:
                         mock_path_class.return_value = mock_report_dir
                         
                         import importlib
-                        import mini_red_team_agent
-                        importlib.reload(mini_red_team_agent)
-                        mini_red_team_agent.main()
+                        import red_team_agent
+                        importlib.reload(red_team_agent)
+                        red_team_agent.main()
         
         # Verify fallback was called
         mock_browse_url.assert_called_once_with("https://example.com")

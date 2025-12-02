@@ -125,20 +125,18 @@ def test_sql_injection_patterns(url: str, form_data: Optional[Dict[str, Any]] = 
                     except:
                         pass
         
-        # Build report
-        report = f"SQL Injection Testing for {url}\n"
-        report += "=" * 60 + "\n\n"
-        
+        # Build concise report
         if vulnerabilities:
-            report += "⚠ POTENTIAL SQL INJECTION VULNERABILITIES FOUND:\n"
-            for vuln in vulnerabilities:
-                report += f"  {vuln}\n"
-            report += "\n"
+            report = f"SQL Injection Testing for {url}: ⚠ POTENTIAL VULNERABILITIES FOUND\n"
+            report += "\n".join([f"  {vuln}" for vuln in vulnerabilities[:5]])  # Limit to 5
+            if len(vulnerabilities) > 5:
+                report += f"\n  ... and {len(vulnerabilities) - 5} more"
         else:
-            report += "✓ No obvious SQL injection vulnerabilities detected\n\n"
+            report = f"SQL Injection Testing for {url}: ✓ No obvious SQL injection vulnerabilities detected"
         
-        report += "Note: This is a basic test using common payloads. "
-        report += "Manual verification and deeper testing recommended for any potential vulnerabilities."
+        # Limit output length to prevent context bloat
+        if len(report) > 500:
+            report = report[:500] + f"\n[Truncated - {len(report)} chars total]"
         
         return report
         

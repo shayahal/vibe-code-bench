@@ -152,10 +152,26 @@ def main():
         print(f"Error creating agent: {e}")
         sys.exit(1)
     
+    # Generate unique run ID (timestamp-based, matches report filename format)
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Set trace name to include run ID for easy identification in LangFuse
+    trace_name = f"Security Assessment - {args.url} - Run {run_id}"
+    
+    # Reinitialize handler with trace name (if supported)
+    # Note: LangFuse handler may create trace automatically, so we'll update it after if needed
+    try:
+        # Try to set trace name via handler if it supports it
+        if hasattr(langfuse_handler, 'set_trace_name'):
+            langfuse_handler.set_trace_name(trace_name)
+    except:
+        pass  # Not critical if not supported
+    
     # Run the agent
     print(f"\n🔴 Red Team Security Assessment")
     print("=" * 60)
     print(f"Target URL: {args.url}")
+    print(f"Run ID: {run_id}")
     print("=" * 60)
     print("The agent will perform automated security testing:")
     print("  • Security headers analysis")
@@ -182,10 +198,12 @@ def main():
             config={
                 "callbacks": [langfuse_handler],
                 "metadata": {
+                    "run_id": run_id,
                     "url": args.url,
                     "model": "anthropic/claude-3-haiku",
                     "provider": "openrouter",
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
+                    "trace_name": trace_name
                 }
             }
         )
@@ -214,6 +232,20 @@ def main():
                 trace_id = langfuse_handler.get_trace_id()
             elif hasattr(langfuse_handler, 'run') and langfuse_handler.run:
                 trace_id = langfuse_handler.run.trace_id if hasattr(langfuse_handler.run, 'trace_id') else None
+            
+            # Update trace name and metadata if we have trace_id
+            if trace_id:
+                try:
+                    # Use LangFuse client to update trace metadata
+                    # The trace name and metadata will help identify which run this trace belongs to
+                    langfuse_client.trace(id=trace_id).update(
+                        name=trace_name,
+                        metadata={"run_id": run_id, "url": args.url}
+                    )
+                except Exception as e:
+                    # Trace might not be immediately available or update might fail
+                    # Metadata in config should still be visible in LangFuse
+                    pass
         except Exception as e:
             pass  # Trace ID extraction is optional
         
@@ -260,14 +292,14 @@ def main():
             url=args.url,
             output=output,
             execution_time=execution_time,
-            langfuse_handler=langfuse_handler
+            langfuse_handler=langfuse_handler,
+            run_id=run_id
         )
         
         # Save report to file
         report_dir = Path("mini/reports")
         report_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_file = report_dir / f"run_report_{timestamp}.md"
+        report_file = report_dir / f"run_report_{run_id}.md"
         report_file.write_text(report, encoding='utf-8')
         
         print("\nResult:")
@@ -276,6 +308,7 @@ def main():
         print("-" * 60)
         print(f"\n✓ All observability data logged to LangFuse")
         print(f"  - Check your LangFuse dashboard: {langfuse_host}")
+        print(f"  - Run ID: {run_id} (use this to filter traces)")
         if trace_id:
             print(f"  - Trace ID: {trace_id}")
             print(f"  - Direct Trace Link: {langfuse_host}/traces/{trace_id}")
@@ -298,18 +331,20 @@ def main():
         
         # Generate a basic report even on error
         try:
+            # Generate run_id for error case too
+            error_run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
             report = generate_run_report(
                 llm=llm,
                 langfuse_client=langfuse_client,
                 url=args.url,
                 output=result,
                 execution_time=execution_time,
-                langfuse_handler=langfuse_handler
+                langfuse_handler=langfuse_handler,
+                run_id=error_run_id
             )
             report_dir = Path("mini/reports")
             report_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report_file = report_dir / f"run_report_{timestamp}.md"
+            report_file = report_dir / f"run_report_{error_run_id}.md"
             report_file.write_text(report, encoding='utf-8')
             print(f"\n✓ Run report generated: {report_file}")
         except Exception as report_error:

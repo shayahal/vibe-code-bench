@@ -82,26 +82,20 @@ def analyze_security_headers(url: str) -> str:
         else:
             findings.append(f"✓ Permissions-Policy: {security_headers['Permissions-Policy']}")
         
-        # Build report
-        report = f"Security Headers Analysis for {url}\n"
-        report += "=" * 60 + "\n\n"
-        
-        if findings:
-            report += "PRESENT HEADERS:\n"
-            for finding in findings:
-                report += f"  {finding}\n"
-            report += "\n"
-        
+        # Build concise report (focus on issues, not verbose formatting)
         if issues:
-            report += "SECURITY ISSUES:\n"
-            for issue in issues:
-                report += f"  ⚠ {issue}\n"
+            report = f"Security Headers Analysis for {url}:\n"
+            report += "\n".join(f"  ⚠ {issue}" for issue in issues)
+            if findings:
+                report += "\n\nPresent headers: " + ", ".join([f.split(":")[0].replace("✓ ", "") for f in findings])
         else:
-            report += "✓ All critical security headers are present\n"
+            report = f"Security Headers Analysis for {url}: ✓ All critical security headers are present"
+            if findings:
+                report += "\nPresent: " + ", ".join([f.split(":")[0].replace("✓ ", "") for f in findings])
         
-        report += f"\nAll Headers:\n"
-        for header, value in security_headers.items():
-            report += f"  {header}: {value}\n"
+        # Limit output length to prevent context bloat
+        if len(report) > 500:
+            report = report[:500] + f"\n[Truncated - {len(report)} chars total]"
         
         return report
         

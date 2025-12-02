@@ -3,252 +3,122 @@ Benchmark for the security of vibe coded apps
 
 ---
 
-## LangChain Red-Teaming Agent for Web Security
+## Red Team Agent
 
-A comprehensive LangChain-based agent that integrates **30+ open-source red-team security tools** for performing comprehensive security testing and red-teaming on web applications, networks, and cloud environments.
+A lightweight, focused LangChain-based agent for automated web security testing. The red team agent performs comprehensive security assessments using a curated set of security testing tools, powered by Claude Mini (anthropic/claude-3-haiku) via OpenRouter.
 
-### Architecture Overview
+### Features
+
+- **Focused Security Testing**: 6 essential security testing tools
+- **Intelligent Tool Selection**: LLM-powered agent selects appropriate tools based on target analysis
+- **Comprehensive Reporting**: Detailed security reports with vulnerability classifications
+- **Observability**: Full trace tracking with LangFuse integration
+- **Lightweight**: Fast execution with minimal dependencies
+
+---
+
+## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Red Team Agent (LangChain)                    │
+│              Red Team Agent (LangChain)                         │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Tool Factory (RedTeamToolFactory)            │  │
+│  │              Security Testing Tools                       │  │
 │  │                                                           │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │  │
-│  │  │   Web App    │  │   Network    │  │  Cloud/AD    │ │  │
-│  │  │    Tools     │  │    Tools     │  │    Tools     │ │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │  │
-│  │                                                           │  │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │  │
-│  │  │ Reconnaissance│  │ Exploitation │  │ Post-Exploit │ │  │
-│  │  │    Tools     │  │   Frameworks │  │    Tools     │ │  │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘ │  │
+│  │  • browse_url - Page structure analysis                  │  │
+│  │  • analyze_security_headers - HTTP security headers     │  │
+│  │  • test_xss_patterns - XSS vulnerability testing         │  │
+│  │  • test_sql_injection_patterns - SQLi testing            │  │
+│  │  • analyze_authentication - Auth mechanism analysis      │  │
+│  │  • generate_security_report - Report generation          │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              LLM Agent (Claude/GPT-4)                   │  │
-│  │         Orchestrates tool selection and execution       │  │
+│  │         LLM Agent (Claude Mini via OpenRouter)           │  │
+│  │         Intelligent tool selection and orchestration      │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │              LangFuse Observability                      │  │
+│  │         Full trace tracking and monitoring               │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
-                    │  Target System   │
-                    │  (Web/Network/   │
-                    │   Cloud/AD)      │
+                    │   Target Web App │
                     └──────────────────┘
 ```
 
-### Tool Categories & Workflow
+### Testing Workflow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        Red Team Workflow                             │
+│                    Red Team Workflow                                │
 └─────────────────────────────────────────────────────────────────────┘
 
 1. RECONNAISSANCE
    │
-   ├─► Subdomain Discovery (Subfinder, Amass, theHarvester)
-   ├─► Parameter Discovery (ParamSpider, Arjun)
-   └─► Information Gathering (theHarvester, Shodan)
+   └─► Browse URL to understand structure, forms, and inputs
    │
    ▼
-2. SCANNING & ENUMERATION
+2. SECURITY HEADERS ANALYSIS
    │
-   ├─► Web Application Scanning (Nuclei, OWASP ZAP, Nikto, Wapiti)
-   ├─► Network Scanning (Nmap, Masscan, RustScan)
-   ├─► Directory Brute Forcing (Gobuster, FFuF)
-   └─► Vulnerability Detection (Nuclei templates, SQLMap, Dalfox)
+   └─► Analyze HTTP security headers (CSP, HSTS, etc.)
    │
    ▼
-3. EXPLOITATION
+3. VULNERABILITY TESTING
    │
-   ├─► XSS Testing (Dalfox, XSStrike)
-   ├─► SQL Injection (SQLMap)
-   ├─► Command Injection (Custom payloads)
-   ├─► Path Traversal (Custom payloads)
-   └─► Metasploit Exploits
+   ├─► XSS Testing (if inputs found)
+   ├─► SQL Injection Testing (if database-driven)
+   └─► Authentication Analysis (if auth mechanisms found)
    │
    ▼
-4. POST-EXPLOITATION
+4. REPORTING
    │
-   ├─► Privilege Escalation (LinPEAS, WinPEAS)
-   ├─► Active Directory (BloodHound, CrackMapExec)
-   └─► Password Cracking (Hashcat, John the Ripper, Hydra)
-   │
-   ▼
-5. REPORTING
-   │
-   └─► Comprehensive Security Report Generation
+   └─► Generate comprehensive security report
 ```
-
-### Features
-
-- **30+ Integrated Tools**: All major open-source red-team tools integrated
-- **Multi-Domain Testing**: Web applications, networks, Active Directory, cloud environments
-- **Intelligent Orchestration**: LLM-powered agent selects appropriate tools based on context
-- **Comprehensive Reporting**: Detailed security reports with vulnerability classifications
-- **Extensible Architecture**: Easy to add new tools and testing scenarios
 
 ---
 
-## Integrated Red-Team Tools
+## Security Testing Tools
 
-### 🌐 Web Application Security Tools
+The red team agent includes 6 focused security testing tools:
 
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Nuclei** | Fast vulnerability scanner with community templates | `go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest` |
-| **SQLMap** | Automated SQL injection testing | `pip install sqlmap` |
-| **Dalfox** | XSS vulnerability scanner | `go install github.com/hahwul/dalfox/v2@latest` |
-| **XSStrike** | Advanced XSS detection | `pip install xsstrike` |
-| **OWASP ZAP** | Web application security scanner | Download from [OWASP ZAP](https://www.zaproxy.org/) |
-| **Nikto** | Web server scanner | `apt install nikto` or `brew install nikto` |
-| **Wapiti** | Web vulnerability scanner | `pip install wapiti3` |
-| **ParamSpider** | Parameter discovery | `pip install paramspider` |
-| **Arjun** | Parameter discovery | `pip install arjun` |
-| **Wfuzz** | Web fuzzer | `pip install wfuzz` |
+### 1. **browse_url**
+- Fetches and parses web page content
+- Extracts HTML, forms, links, and metadata
+- Identifies input fields and authentication mechanisms
+- **Use**: First step to understand target structure
 
-**Usage Example:**
-```python
-# Scan for vulnerabilities with Nuclei
-result = agent.scan_with_nuclei("https://example.com", template_tags="xss,sqli")
+### 2. **analyze_security_headers**
+- Checks HTTP security headers (CSP, HSTS, X-Frame-Options, etc.)
+- Identifies missing or misconfigured headers
+- **Use**: Early assessment of security posture
 
-# Test SQL injection with SQLMap
-result = agent.scan_with_sqlmap("https://example.com/page?id=1", parameter="id")
+### 3. **test_xss_patterns**
+- Tests for Cross-Site Scripting vulnerabilities
+- Injects XSS payloads into URL parameters and form fields
+- Detects reflected XSS vulnerabilities
+- **Use**: When input fields or URL parameters are found
 
-# Discover XSS with Dalfox
-result = agent.scan_xss_with_dalfox("https://example.com/search?q=test")
-```
+### 4. **test_sql_injection_patterns**
+- Tests for SQL injection vulnerabilities
+- Injects SQLi payloads to detect error-based and blind SQL injection
+- Tests URL parameters and form fields
+- **Use**: When database-driven functionality is detected
 
-### 🔍 Network & Infrastructure Tools
+### 5. **analyze_authentication**
+- Analyzes authentication mechanisms
+- Identifies login forms, session management, and auth vulnerabilities
+- Checks for HTTPS usage, cookie security, CSRF protection
+- **Use**: When authentication endpoints are discovered
 
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Nmap** | Network discovery and port scanning | `apt install nmap` or `brew install nmap` |
-| **Masscan** | Fast port scanner | `apt install masscan` or `brew install masscan` |
-| **RustScan** | Ultra-fast port scanner | `cargo install rustscan` |
-
-**Usage Example:**
-```python
-# Network scan with Nmap
-result = agent.scan_with_nmap("192.168.1.0/24", scan_type="vuln")
-
-# Fast port scan with Masscan
-result = agent.scan_with_masscan("192.168.1.1", ports="1-1000", rate="1000")
-```
-
-### 🔎 Reconnaissance Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Subfinder** | Subdomain discovery | `go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest` |
-| **Amass** | Subdomain enumeration | `go install github.com/owasp-amass/amass/v4/...@master` |
-| **theHarvester** | Email/subdomain/people discovery | `pip install theHarvester` |
-
-**Usage Example:**
-```python
-# Discover subdomains
-result = agent.discover_subdomains("example.com")
-
-# Information gathering with theHarvester
-result = agent.discover_with_theharvester("example.com", sources="all")
-```
-
-### 📁 Directory & File Discovery
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Gobuster** | Directory/file brute forcing | `go install github.com/OJ/gobuster/v3@latest` |
-| **FFuF** | Fast web fuzzer | `go install github.com/ffuf/ffuf/v2@latest` |
-
-**Usage Example:**
-```python
-# Brute force directories
-result = agent.brute_force_directories("https://example.com", wordlist="/path/to/wordlist.txt")
-```
-
-### 🏢 Active Directory Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **BloodHound** | AD attack path mapping | `pip install bloodhound` |
-| **CrackMapExec** | Network pentesting framework | `pip install crackmapexec` |
-
-**Usage Example:**
-```python
-# Collect BloodHound data
-result = agent.bloodhound_ingest("domain.local", collection_method="all")
-
-# Scan with CrackMapExec
-result = agent.crackmapexec_scan("192.168.1.0/24", scan_type="smb")
-```
-
-### 💣 Exploitation Frameworks
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Metasploit** | Exploitation framework | `apt install metasploit-framework` |
-
-**Usage Example:**
-```python
-# Execute Metasploit exploit
-result = agent.metasploit_exploit("192.168.1.100", exploit="exploit/windows/smb/ms17_010_eternalblue")
-```
-
-### 🔐 Password & Credential Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Hashcat** | Advanced password recovery | `apt install hashcat` or `brew install hashcat` |
-| **John the Ripper** | Password cracker | `apt install john` or `brew install john-jumbo` |
-| **Hydra** | Network login cracker | `apt install hydra` or `brew install hydra` |
-
-**Usage Example:**
-```python
-# Crack passwords with Hashcat
-result = agent.crack_password_hashcat("/path/to/hashes.txt", hash_type="0")
-
-# Brute force login with Hydra
-result = agent.brute_force_login_hydra("192.168.1.100", service="ssh", username="admin")
-```
-
-### 🛠️ Post-Exploitation Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **LinPEAS** | Linux privilege escalation | Download from [PEASS](https://github.com/carlospolop/PEASS-ng) |
-| **WinPEAS** | Windows privilege escalation | Download from [PEASS](https://github.com/carlospolop/PEASS-ng) |
-
-**Usage Example:**
-```python
-# Run LinPEAS scan (requires SSH access)
-result = agent.linpeas_scan("192.168.1.100")
-```
-
-### ☁️ Cloud Security Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **Pacu** | AWS exploitation framework | `pip install pacu` |
-| **Scout Suite** | Multi-cloud security auditing | `pip install scoutsuite` |
-
-**Usage Example:**
-```python
-# Scan AWS with Pacu
-result = agent.scan_aws_pacu(aws_key="...", aws_secret="...", region="us-east-1")
-
-# Scan cloud with Scout Suite
-result = agent.scan_cloud_scout_suite("aws", credentials={...})
-```
-
-### 🔌 API Security Tools
-
-| Tool | Purpose | Installation |
-|------|---------|--------------|
-| **REST-Attacker** | REST API security testing | `pip install rest-attacker` |
+### 6. **generate_security_report**
+- Compiles all findings, vulnerabilities, and recommendations
+- Creates structured markdown report
+- **Use**: Final step to document all findings
 
 ---
 
@@ -261,85 +131,31 @@ git clone <repository-url>
 cd vibe-code-bench
 ```
 
-### 2. Install All Tools (Recommended)
-
-**Option A: Automated Installation Script (Recommended)**
-
-We provide installation scripts that automatically install all tools:
-
-**Bash Script (Linux/macOS):**
-```bash
-./install_tools.sh
-```
-
-**Python Script (Cross-platform):**
-```bash
-python3 install_tools.py
-# or
-./install_tools.py
-```
-
-The scripts will:
-1. ✅ Install all Python packages from `requirements.txt`
-2. ✅ Install system packages (nmap, nikto, hashcat, etc.) using your package manager
-3. ✅ Install Go-based tools (nuclei, dalfox, subfinder, etc.) if Go is installed
-4. ✅ Install Rust-based tools (rustscan) if Rust/Cargo is installed
-5. ✅ Verify all installations and report status
-
-**Option B: Manual Installation**
-
-If you prefer manual installation or the script doesn't work for your system:
+### 2. Install Python Dependencies
 
 ```bash
-# 1. Install Python dependencies
 pip install -r requirements.txt
-
-# 2. Install system packages (choose based on your OS)
-
-# macOS (using Homebrew)
-brew install nmap nikto masscan hashcat john-jumbo hydra
-
-# Linux - Debian/Ubuntu (using apt)
-sudo apt-get update
-sudo apt-get install -y nmap masscan nikto hashcat john hydra metasploit-framework
-
-# Linux - RHEL/CentOS (using yum)
-sudo yum install -y nmap nikto hashcat john hydra
-
-# 3. Install Go-based tools (requires Go: https://go.dev/dl/)
-go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-go install github.com/hahwul/dalfox/v2@latest
-go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-go install github.com/owasp-amass/amass/v4/...@master
-go install github.com/OJ/gobuster/v3@latest
-go install github.com/ffuf/ffuf/v2@latest
-
-# Make sure Go bin directory is in PATH
-export PATH="$PATH:$(go env GOPATH)/bin"
-
-# 4. Install Rust-based tools (requires Rust: https://rustup.rs/)
-cargo install rustscan
 ```
 
-#### Verify Installation
+### 3. Set Up Environment Variables
+
+Create a `.env` file in the project root:
 
 ```bash
-# Check if tools are available
-which nuclei sqlmap dalfox nmap subfinder gobuster hashcat rustscan
+# Required: OpenRouter API key (for Claude Mini)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 
-# Or run the verification from the install script
-python3 install_tools.py  # Will verify at the end
+# Required: LangFuse credentials (for observability)
+LANGFUSE_SECRET_KEY=your_langfuse_secret_key
+LANGFUSE_PUBLIC_KEY=your_langfuse_public_key
+
+# Optional: Custom LangFuse host (defaults to cloud.langfuse.com)
+LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-### 4. Set Up Environment Variables
-
-```bash
-cp .env.example .env
-# Edit .env and add your API keys:
-# OPENROUTER_API_KEY=your_key_here
-# ANTHROPIC_API_KEY=your_key_here  # Optional
-# OPENAI_API_KEY=your_key_here      # Optional
-```
+**Get API Keys:**
+- OpenRouter: https://openrouter.ai/
+- LangFuse: https://cloud.langfuse.com
 
 ---
 
@@ -347,135 +163,30 @@ cp .env.example .env
 
 ### Command-Line Usage
 
-#### Basic Web Application Scan
+#### Basic Security Assessment
 
 ```bash
-python red_team_agent.py --url https://example.com
+python mini/red_team_agent.py --url https://example.com
 ```
 
-#### Comprehensive Security Assessment
+#### With Custom API Key
 
 ```bash
-python red_team_agent.py \
+python mini/red_team_agent.py \
   --url https://example.com \
-  --provider openrouter \
-  --model openai/gpt-3.5-turbo \
-  --scenario "Perform comprehensive security testing including XSS, SQL injection, and directory enumeration"
-```
-
-#### Network Scanning
-
-```bash
-python red_team_agent.py \
-  --url 192.168.1.0/24 \
-  --scenario "Scan network for open ports and vulnerabilities"
-```
-
-#### Custom Headers
-
-```bash
-python red_team_agent.py \
-  --url https://example.com \
-  --headers '{"Authorization": "Bearer token123", "User-Agent": "CustomAgent/1.0"}'
+  --api-key your_openrouter_api_key
 ```
 
 ### Programmatic Usage
 
 ```python
-from red_team_agent import RedTeamAgent
+from mini.red_team_agent import main
+import sys
 
-# Initialize the agent
-agent = RedTeamAgent(
-    target_url="https://example.com",
-    provider="openrouter",
-    model_name="openai/gpt-3.5-turbo",
-    headers={"User-Agent": "SecurityScanner/1.0"}
-)
-
-# Run comprehensive test suite
-report = agent.run_test_suite()
-
-# Or use specific tools directly
-result = agent.scan_with_nuclei("https://example.com", template_tags="xss,sqli")
-result = agent.discover_subdomains("example.com")
-result = agent.scan_with_nmap("192.168.1.1", scan_type="vuln")
+# Set up arguments
+sys.argv = ['red_team_agent.py', '--url', 'https://example.com']
+main()
 ```
-
----
-
-## Tool Selection Flow
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Agent Receives Security Task                   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-        ┌───────────────────────────────────────┐
-        │   LLM Analyzes Task Requirements      │
-        └───────────────────────────────────────┘
-                            │
-        ┌───────────────────┴───────────────────┐
-        │                                       │
-        ▼                                       ▼
-┌───────────────┐                      ┌───────────────┐
-│  Web App      │                      │  Network      │
-│  Testing      │                      │  Testing      │
-└───────────────┘                      └───────────────┘
-        │                                       │
-        ▼                                       ▼
-┌───────────────────────────────────────────────────────────┐
-│  Tool Selection Logic:                                    │
-│                                                           │
-│  IF target is URL:                                        │
-│    → Use web tools (Nuclei, SQLMap, Dalfox, etc.)        │
-│                                                           │
-│  IF target is IP/Network:                                │
-│    → Use network tools (Nmap, Masscan, RustScan)         │
-│                                                           │
-│  IF task is "discover subdomains":                       │
-│    → Use Subfinder, Amass, theHarvester                  │
-│                                                           │
-│  IF task is "brute force":                              │
-│    → Use Gobuster, FFuF, Hydra                           │
-│                                                           │
-│  IF task is "crack passwords":                           │
-│    → Use Hashcat, John the Ripper                       │
-└───────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-        ┌───────────────────────────────────────┐
-        │   Execute Selected Tools             │
-        └───────────────────────────────────────┘
-                            │
-                            ▼
-        ┌───────────────────────────────────────┐
-        │   Aggregate Results & Generate Report │
-        └───────────────────────────────────────┘
-```
-
----
-
-## Configuration
-
-### Environment Variables
-
-**API Keys (one required based on provider):**
-- `OPENROUTER_API_KEY`: Your OpenRouter API key (for openrouter provider)
-- `ANTHROPIC_API_KEY`: Your Anthropic API key (for anthropic provider)
-- `OPENAI_API_KEY`: Your OpenAI API key (for openai provider)
-
-**Provider Options:**
-- `--provider`: Choose provider: `openrouter` (default), `anthropic`, or `openai`
-- `--model`: Model name (defaults based on provider)
-  - OpenRouter: `openai/gpt-3.5-turbo` (default)
-  - Anthropic: `claude-3-haiku-20240307` (default)
-  - OpenAI: `gpt-3.5-turbo` (default)
-
-**Other Configuration:**
-- `DEFAULT_TEMPERATURE`: LLM temperature (default: 0.7)
-- `MAX_TEST_ITERATIONS`: Maximum number of test iterations
-- `ENABLE_VERBOSE`: Enable verbose output
 
 ---
 
@@ -483,90 +194,87 @@ result = agent.scan_with_nmap("192.168.1.1", scan_type="vuln")
 
 The agent generates comprehensive security reports in Markdown format:
 
+### Report Structure
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Security Report Structure                  │
+│              Security Report Structure                       │
 └─────────────────────────────────────────────────────────────┘
 
 1. Executive Summary
    ├─ Total tests performed
    ├─ Vulnerabilities found
-   ├─ Critical vulnerabilities count
-   └─ High severity vulnerabilities count
+   ├─ Risk level assessment
+   └─ Key findings
 
 2. Vulnerability Breakdown
    ├─ Critical Vulnerabilities
-   │   ├─ Issue description
-   │   ├─ Affected URL/Resource
-   │   ├─ Parameter/Vector
-   │   ├─ Payload used
-   │   └─ Timestamp
-   │
-   └─ High Severity Vulnerabilities
-       └─ (Same structure as above)
+   ├─ High Severity Vulnerabilities
+   ├─ Medium Severity Vulnerabilities
+   └─ Low Severity Vulnerabilities
 
-3. Detailed Test Results
-   ├─ Test type
-   ├─ Target URL/Resource
-   ├─ Vulnerability status
-   ├─ Issue details
-   └─ Timestamp
+3. Detailed Findings
+   ├─ Security headers analysis
+   ├─ XSS test results
+   ├─ SQL injection test results
+   └─ Authentication analysis
 
-4. Tool-Specific Findings
-   ├─ Nuclei findings
-   ├─ SQLMap results
-   ├─ Nmap scan results
-   └─ Other tool outputs
+4. Recommendations
+   └─ Actionable security improvements
 ```
 
-**Report Location:**
-- Reports are saved in `runs/run_YYYYMMDD_HHMMSS/reports/red_team_report.md`
-- Logs are saved in `runs/run_YYYYMMDD_HHMMSS/logs/`
+### Report Location
+
+- Reports are saved in `mini/reports/run_report_YYYYMMDD_HHMMSS.md`
+- Each run generates a timestamped report file
+
+### LangFuse Observability
+
+All agent runs are automatically tracked in LangFuse:
+- **Full trace tracking**: All LLM calls, tool calls, and agent actions
+- **Cost tracking**: Token usage and API costs
+- **Performance metrics**: Execution time and latency
+- **Debugging**: Complete execution traces for troubleshooting
+
+Access your traces at: https://cloud.langfuse.com
 
 ---
 
-## Tool Integration Architecture
+## Configuration
 
+### Environment Variables
+
+**Required:**
+- `OPENROUTER_API_KEY`: Your OpenRouter API key
+- `LANGFUSE_SECRET_KEY`: Your LangFuse secret key
+- `LANGFUSE_PUBLIC_KEY`: Your LangFuse public key
+
+**Optional:**
+- `LANGFUSE_HOST`: Custom LangFuse host (default: `https://cloud.langfuse.com`)
+
+### Model Configuration
+
+The agent uses:
+- **Model**: `anthropic/claude-3-haiku` (Claude Mini)
+- **Provider**: OpenRouter
+- **Temperature**: 0.7
+- **Max Tokens**: 2000
+
+---
+
+## Testing
+
+Run the test suite:
+
+```bash
+pytest mini/test_mini_agent.py -v
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    RedTeamToolFactory                         │
-│                                                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Tool Creation Methods (create_*)                    │   │
-│  │                                                       │   │
-│  │  • create_scan_with_nuclei()                         │   │
-│  │  • create_scan_with_sqlmap()                         │   │
-│  │  • create_scan_with_nmap()                           │   │
-│  │  • create_discover_subdomains()                       │   │
-│  │  • ... (30+ tool methods)                            │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Shared Dependencies                                  │   │
-│  │  • HTTP Session                                       │   │
-│  │  • Test Results Storage                               │   │
-│  │  • Logging Trail                                      │   │
-│  │  • Headers & Cookies                                  │   │
-│  └──────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-        ┌───────────────────────────────────────┐
-        │   Tool Execution                      │
-        │   • Check tool availability           │
-        │   • Run subprocess commands           │
-        │   • Parse output                      │
-        │   • Return structured results         │
-        └───────────────────────────────────────┘
-                            │
-                            ▼
-        ┌───────────────────────────────────────┐
-        │   LangChain Agent                     │
-        │   • Receives tool results             │
-        │   • Decides next actions               │
-        │   • Orchestrates tool chain            │
-        └───────────────────────────────────────┘
-```
+
+Tests cover:
+- Tool functionality
+- Tools registry
+- Report generation
+- Main agent execution (with mocks)
 
 ---
 
@@ -574,26 +282,11 @@ The agent generates comprehensive security reports in Markdown format:
 
 ### Web Application Vulnerabilities
 
-- **XSS (Cross-Site Scripting)**: Multiple payload types (script tags, event handlers, SVG, iframe)
-- **SQL Injection**: Union-based, boolean-based, time-based, and comment-based attacks
-- **Command Injection**: Unix and Windows command injection vectors
-- **Path Traversal**: Directory traversal attacks
-- **CSRF (Cross-Site Request Forgery)**: Form submission without proper tokens
-- **Authentication Bypass**: Weak passwords, account enumeration, brute force
-- **Authorization Bypass**: Access control testing
-- **Sensitive Data Exposure**: Detection of emails, credit cards, API keys, passwords
-
-### Network Vulnerabilities
-
-- **Open Ports**: Port scanning and service enumeration
-- **Service Vulnerabilities**: Version detection and known vulnerability scanning
-- **Network Misconfigurations**: Security header analysis, exposed services
-
-### Cloud & Infrastructure Vulnerabilities
-
-- **AWS Misconfigurations**: IAM policies, S3 buckets, security groups
-- **Active Directory**: Attack path mapping, privilege escalation vectors
-- **API Security**: REST API vulnerability testing
+- **XSS (Cross-Site Scripting)**: Multiple payload types tested
+- **SQL Injection**: Error-based and blind SQL injection detection
+- **Security Headers**: Missing or misconfigured HTTP security headers
+- **Authentication Issues**: Weak authentication mechanisms, session management
+- **Sensitive Data Exposure**: Detection of exposed sensitive information
 
 ---
 
@@ -621,27 +314,6 @@ This tool is designed for **ethical security testing** only. Use it to:
 
 ## Troubleshooting
 
-### Tool Not Found Errors
-
-If you see errors like "Tool not found in PATH":
-
-1. **Verify Installation:**
-   ```bash
-   which nuclei sqlmap nmap
-   ```
-
-2. **Add to PATH:**
-   ```bash
-   # For Go tools
-   export PATH=$PATH:$(go env GOPATH)/bin
-   
-   # For Python tools
-   export PATH=$PATH:~/.local/bin
-   ```
-
-3. **Install Missing Tools:**
-   Refer to the installation section above for each tool.
-
 ### API Key Errors
 
 If you see API key errors:
@@ -664,13 +336,29 @@ If you see API key errors:
    print(os.getenv("OPENROUTER_API_KEY"))
    ```
 
-### Timeout Errors
+### LangFuse Errors
 
-Some tools may timeout on large targets:
+If LangFuse initialization fails:
 
-1. **Increase timeout in code** (default: 300 seconds)
-2. **Use smaller target scopes** (e.g., single IP instead of entire subnet)
-3. **Run tools individually** instead of comprehensive scans
+1. **Verify credentials:**
+   ```bash
+   cat .env | grep LANGFUSE
+   ```
+
+2. **Check LangFuse dashboard:** https://cloud.langfuse.com
+
+3. **Verify network connectivity** to LangFuse host
+
+### Import Errors
+
+If you see import errors:
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Check Python version:** Requires Python 3.8+
 
 ---
 
@@ -680,29 +368,33 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ### Adding New Tools
 
-To add a new tool integration:
+To add a new security testing tool:
 
-1. **Add tool method to `RedTeamToolFactory`:**
+1. **Create tool module** in `mini/tools/`:
    ```python
-   def create_scan_with_newtool(self) -> Callable:
-       def scan_with_newtool(target: str) -> Dict[str, Any]:
-           # Tool implementation
-           pass
-       return scan_with_newtool
-   ```
-
-2. **Register tool in `red_team_agent.py`:**
-   ```python
-   scan_with_newtool = tool_factory.create_scan_with_newtool()
+   # mini/tools/new_tool.py
+   def test_new_vulnerability(url: str) -> str:
+       # Tool implementation
+       pass
    
-   tools.append(StructuredTool.from_function(
-       func=scan_with_newtool,
-       name="scan_with_newtool",
-       description="Description of what the tool does"
-   ))
+   def get_new_tool() -> StructuredTool:
+       return StructuredTool.from_function(
+           func=test_new_vulnerability,
+           name="test_new_vulnerability",
+           description="Description of what the tool does"
+       )
    ```
 
-3. **Update this README** with tool information
+2. **Register tool** in `mini/tools/__init__.py`:
+   ```python
+   from .new_tool import test_new_vulnerability, get_new_tool
+   
+   TOOLS_REGISTRY["test_new_vulnerability"] = get_new_tool
+   ```
+
+3. **Update prompt** in `mini/red_team_prompt.py` to include the new tool
+
+4. **Add tests** in `mini/test_mini_agent.py`
 
 ---
 
@@ -714,13 +406,10 @@ To add a new tool integration:
 
 ## Acknowledgments
 
-This project integrates the following open-source security tools:
+This project uses:
+- [LangChain](https://www.langchain.com/) - LLM application framework
+- [Claude Mini (Haiku)](https://www.anthropic.com/) - Fast, efficient LLM via OpenRouter
+- [LangFuse](https://langfuse.com/) - Observability and monitoring
+- [OpenRouter](https://openrouter.ai/) - Unified API for LLMs
 
-- [Nuclei](https://github.com/projectdiscovery/nuclei) - Fast vulnerability scanner
-- [SQLMap](https://github.com/sqlmapproject/sqlmap) - SQL injection testing
-- [Nmap](https://nmap.org/) - Network mapper
-- [Metasploit](https://www.metasploit.com/) - Exploitation framework
-- [BloodHound](https://github.com/BloodHoundAD/BloodHound) - Active Directory analysis
-- And 25+ other excellent open-source security tools
-
-Thank you to all the security researchers and developers who created these tools!
+Thank you to all the security researchers and developers who created the tools and frameworks that make this project possible!
