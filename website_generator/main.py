@@ -18,12 +18,15 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from core.llm_setup import initialize_llm
 from core.run_directory import setup_run_directory
 from core.logging_setup import setup_file_logging
-from .prompts import SYSTEM_PROMPT, USER_PROMPT
+from website_generator.prompts import SYSTEM_PROMPT, USER_PROMPT
 
 # Load environment variables
 load_dotenv()
