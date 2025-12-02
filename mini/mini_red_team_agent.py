@@ -1,23 +1,22 @@
 """
 Mini Red Team Agent
 
-A simple CLI-based agent that:
+A CLI-based security testing agent that:
 - Takes a URL as input
-- Uses Claude Mini (anthropic/claude-3-haiku) via OpenRouter
-- Has one browsing tool to fetch the URL
-- Returns the first 3 lines from the website
+- Uses Claude Mini (anthropic/claude-3-haiku) via OpenRouterfor intelligent tool selection
+- Performs automated security testing (XSS, SQL injection, security headers, authentication)
+- Generates comprehensive security assessment reports
+- Uses LangFuse for observability and trace tracking
 """
 
 import os
 import sys
 import argparse
-import requests
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 from dotenv import load_dotenv
-from bs4 import BeautifulSoup
 
 # Load environment variables
 load_dotenv()
@@ -26,7 +25,6 @@ load_dotenv()
 try:
     from langchain_openai import ChatOpenAI
     from langchain.agents import create_agent
-    from langchain_core.tools import StructuredTool
 except ImportError:
     print("Error: langchain-openai is required. Install with: pip install langchain-openai")
     sys.exit(1)
@@ -40,186 +38,23 @@ except ImportError:
     print("Error: langfuse is required. Install with: pip install langfuse")
     sys.exit(1)
 
-
-def generate_run_report(
-    llm: ChatOpenAI,
-    langfuse_client: Langfuse,
-    url: str,
-    output: str,
-    execution_time: float,
-    langfuse_handler: LangfuseCallbackHandler
-) -> str:
-    """
-    Generate a run report using the LLM based on LangFuse trace data.
-    
-    Args:
-        llm: The LLM instance to generate the report
-        langfuse_client: LangFuse client to fetch trace data
-        url: The URL that was browsed
-        output: The agent's output
-        execution_time: Execution time in seconds
-        langfuse_handler: The LangFuse callback handler
-        
-    Returns:
-        Generated report as markdown string
-    """
-    try:
-        # Get trace ID from handler if available
-        trace_id = None
-        if hasattr(langfuse_handler, 'get_trace_id'):
-            try:
-                trace_id = langfuse_handler.get_trace_id()
-            except:
-                pass
-        
-        # Create report generation prompt
-        report_prompt = f"""Generate a comprehensive run report for a web browsing agent execution.
-
-Run Details:
-- URL browsed: {url}
-- Execution time: {execution_time:.2f} seconds
-- Model used: anthropic/claude-3-haiku (via OpenRouter)
-- Timestamp: {datetime.now().isoformat()}
-
-Agent Output:
-{output}
-
-Please generate a detailed markdown report that includes:
-
-1. **Executive Summary**
-   - What the agent did
-   - The target URL
-   - Overall outcome
-
-2. **Tools Used**
-   - List all tools that were used during execution
-   - For each tool, describe what it did
-
-3. **Execution Details**
-   - Total execution time: {execution_time:.2f} seconds
-   - Breakdown of time spent (if available)
-
-4. **Cost Analysis**
-   - Model used: anthropic/claude-3-haiku (via OpenRouter)
-   - Estimated cost (note: actual costs are tracked in LangFuse dashboard)
-   - Token usage (if available from trace data)
-
-5. **Observability**
-   - All traces are logged to LangFuse
-   - Check LangFuse dashboard for detailed trace information, token counts, and costs
-
-Format the report as clean markdown with proper headers and sections."""
-
-        # Generate report using LLM
-        report_response = llm.invoke(report_prompt)
-        report_content = report_response.content if hasattr(report_response, 'content') else str(report_response)
-        
-        # Add header and metadata
-        full_report = f"""# Agent Run Report
-
-**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Target URL:** {url}  
-**Execution Time:** {execution_time:.2f} seconds  
-**Model:** claude-3-haiku-20240307
-
----
-
-{report_content}
-
----
-
-## Technical Details
-
-- **Trace ID:** {trace_id if trace_id else 'Available in LangFuse dashboard'}
-- **LangFuse Dashboard:** Check {os.getenv('LANGFUSE_HOST', 'https://cloud.langfuse.com')} for detailed traces
-- **All observability data** (tokens, costs, detailed traces) is available in LangFuse
-"""
-        
-        return full_report
-        
-    except Exception as e:
-        # Fallback report if generation fails
-        return f"""# Agent Run Report
-
-**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
-**Target URL:** {url}  
-**Execution Time:** {execution_time:.2f} seconds  
-**Model:** anthropic/claude-3-haiku (via OpenRouter)
-
-## Summary
-
-The agent successfully browsed the URL {url} and extracted the first 3 lines of visible text content.
-
-## Tools Used
-
-- **browse_url**: Fetched the webpage, parsed HTML, and extracted visible text content
-
-## Execution Details
-
-- **Total execution time:** {execution_time:.2f} seconds
-- **Model:** anthropic/claude-3-haiku (via OpenRouter)
-
-## Cost Analysis
-
-- **Model:** anthropic/claude-3-haiku (via OpenRouter)
-- **Cost:** Check LangFuse dashboard for detailed cost breakdown
-- **Token usage:** Available in LangFuse trace data
-
-## Output
-
-{output}
-
-## Observability
-
-All execution traces, token usage, and costs are logged to LangFuse. Check the LangFuse dashboard for detailed information.
-
-**Note:** Report generation encountered an error: {str(e)}
-"""
-
-
-def browse_url(url: str) -> str:
-    """
-    Browse a URL and return the first 3 lines of visible text content.
-    
-    Args:
-        url: The URL to browse
-        
-    Returns:
-        First 3 lines of the website's visible text content
-    """
-    try:
-        # Fetch the URL
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        # Parse HTML and extract visible text content
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
-        
-        # Get text content
-        text = soup.get_text()
-        
-        # Extract first 3 non-empty lines
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-        
-        # Return first 3 lines
-        first_3_lines = '\n'.join(lines[:3]) if len(lines) >= 3 else '\n'.join(lines)
-        
-        return f"First 3 lines from {url}:\n{first_3_lines}"
-    except Exception as e:
-        return f"Error browsing {url}: {str(e)}"
+# Import tools from the tools package
+# Use relative imports when running as script, absolute when running as module
+try:
+    from tools import get_tool, get_all_tools, browse_url
+    from report_generator import generate_run_report
+    from red_team_prompt import RED_TEAM_AGENT_PROMPT
+except ImportError:
+    # Fallback for when running as module
+    from mini.tools import get_tool, get_all_tools, browse_url
+    from mini.report_generator import generate_run_report
+    from mini.red_team_prompt import RED_TEAM_AGENT_PROMPT
 
 
 def main():
     """Main entry point for the mini red team agent."""
     parser = argparse.ArgumentParser(
-        description="Mini Red Team Agent - Browse a URL and return first 3 lines"
+        description="Mini Red Team Agent - Automated security testing and vulnerability assessment"
     )
     parser.add_argument(
         "--url",
@@ -274,12 +109,13 @@ def main():
         sys.exit(1)
     
     # Initialize Claude Mini via OpenRouter (anthropic/claude-3-haiku is the mini/fast model)
+    # Increased max_tokens for security testing tasks
     try:
         llm = ChatOpenAI(
             model="anthropic/claude-3-haiku",  # Claude Mini via OpenRouter
             api_key=api_key,
             temperature=0.7,
-            max_tokens=200,
+            max_tokens=2000,  # Increased for security testing tasks
             base_url="https://openrouter.ai/api/v1",
             default_headers={
                 "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
@@ -291,28 +127,24 @@ def main():
         print(f"Error initializing LLM: {e}")
         sys.exit(1)
     
-    # Create the browsing tool
-    browse_tool = StructuredTool.from_function(
-        func=browse_url,
-        name="browse_url",
-        description="Browse a URL and return the first 3 lines of text content. Input: url (the URL to browse)"
-    )
+    # Get all available tools from the tools registry
+    # The agent will choose which tools to use based on the task
+    all_tools = get_all_tools()
     
-    # Create agent with just the browsing tool
-    system_prompt = """You are a simple web browsing agent. 
-Your task is to browse the URL provided by the user and return the first 3 lines from that website.
-
-You have one tool available:
-- browse_url: Browse a URL and get the first 3 lines of content
-
-When the user provides a URL, use the browse_url tool to fetch it and return the first 3 lines."""
+    print(f"✓ Loaded {len(all_tools)} security testing tools:")
+    for tool in all_tools:
+        print(f"  - {tool.name}")
+    
+    # System prompt is imported from red_team_prompt module
+    system_prompt = RED_TEAM_AGENT_PROMPT
     
     try:
-        # Create agent - LangFuse handler will automatically capture all traces
-        # No need to manually create traces - the callback handler does this automatically
+        # Create agent with all available tools
+        # The agent will intelligently choose which tools to use based on the task
+        # LangFuse handler will automatically capture all traces
         agent = create_agent(
             model=llm,
-            tools=[browse_tool],
+            tools=all_tools,
             system_prompt=system_prompt,
             debug=False
         )
@@ -321,10 +153,19 @@ When the user provides a URL, use the browse_url tool to fetch it and return the
         sys.exit(1)
     
     # Run the agent
-    print(f"Browsing URL: {args.url}")
+    print(f"\n🔴 Red Team Security Assessment")
+    print("=" * 60)
+    print(f"Target URL: {args.url}")
+    print("=" * 60)
+    print("The agent will perform automated security testing:")
+    print("  • Security headers analysis")
+    print("  • XSS vulnerability testing")
+    print("  • SQL injection testing")
+    print("  • Authentication mechanism analysis")
+    print("  • Comprehensive security report generation")
     print("=" * 60)
     
-    user_message = f"Browse this URL and return the first 3 lines: {args.url}"
+    user_message = f"Perform a comprehensive security assessment on: {args.url}"
     
     # Track start time for execution duration
     start_time = time.time()
@@ -354,15 +195,52 @@ When the user provides a URL, use the browse_url tool to fetch it and return the
         
         # Extract the result
         if isinstance(result, dict) and "messages" in result:
-            last_message = result["messages"][-1]
-            output = str(last_message.content) if hasattr(last_message, "content") else str(last_message)
+            messages = result["messages"]
+            if messages:
+                last_message = messages[-1]
+                output = str(last_message.content) if hasattr(last_message, "content") else str(last_message)
+            else:
+                output = str(result)
         else:
             output = str(result)
         
         # Wait a moment for LangFuse to process the trace
         time.sleep(2)
-        langfuse_client.flush()  # Ensure data is sent
-        time.sleep(1)  # Give it a moment to process
+        
+        # Flush both the handler's client and the main client to ensure data is sent
+        # This is critical for short-lived scripts to ensure traces are sent
+        try:
+            if hasattr(langfuse_handler, 'langfuse') and langfuse_handler.langfuse:
+                langfuse_handler.langfuse.flush()
+                # Also try shutdown for complete flush
+                if hasattr(langfuse_handler.langfuse, 'shutdown'):
+                    langfuse_handler.langfuse.shutdown()
+        except Exception as e:
+            print(f"  Warning: Error flushing handler: {e}")
+        
+        try:
+            langfuse_client.flush()
+            # Also try shutdown for complete flush
+            if hasattr(langfuse_client, 'shutdown'):
+                langfuse_client.shutdown()
+        except Exception as e:
+            print(f"  Warning: Error flushing client: {e}")
+        
+        # Try to extract trace ID for verification
+        trace_id = None
+        try:
+            # The handler has a last_trace_id attribute that contains the trace ID
+            if hasattr(langfuse_handler, 'last_trace_id'):
+                trace_id = langfuse_handler.last_trace_id
+            elif hasattr(langfuse_handler, 'get_trace_id'):
+                trace_id = langfuse_handler.get_trace_id()
+            elif hasattr(langfuse_handler, 'run') and langfuse_handler.run:
+                trace_id = langfuse_handler.run.trace_id if hasattr(langfuse_handler.run, 'trace_id') else None
+        except Exception as e:
+            pass  # Trace ID extraction is optional
+        
+        # Wait a bit longer for async processing
+        time.sleep(3)
         
         # Generate report using the agent
         report = generate_run_report(
@@ -387,6 +265,8 @@ When the user provides a URL, use the browse_url tool to fetch it and return the
         print("-" * 60)
         print(f"\n✓ All observability data logged to LangFuse")
         print(f"  - Check your LangFuse dashboard: {langfuse_host}")
+        if trace_id:
+            print(f"  - Trace ID: {trace_id}")
         print(f"\n✓ Run report generated: {report_file}")
         
     except Exception as e:

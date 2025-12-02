@@ -1,16 +1,16 @@
 """
-Mini Red Team Agent Tools
+Example: Using @tool decorator instead of StructuredTool.from_function()
 
-This module contains tools for the mini red team agent.
-Currently includes a simple URL browsing tool.
+This shows the alternative approach using @tool decorator.
 """
 
 import requests
 from bs4 import BeautifulSoup
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import tool  # Import @tool decorator
 
 
-def browse_url(url: str) -> str:
+@tool
+def browse_url_with_decorator(url: str) -> str:
     """
     Browse a URL and return the first 3 lines of visible text content.
     
@@ -49,16 +49,6 @@ def browse_url(url: str) -> str:
         return f"Error browsing {url}: {str(e)}"
 
 
-def get_browse_tool() -> StructuredTool:
-    """
-    Create and return the browse_url tool for use with LangChain agents.
-    
-    Returns:
-        StructuredTool instance for browsing URLs
-    """
-    return StructuredTool.from_function(
-        func=browse_url,
-        name="browse_url",
-        description="Browse a URL and return the first 3 lines of text content. Input: url (the URL to browse)"
-    )
+# With @tool, the function IS the tool - no need for get_browse_tool() function!
+# You can use browse_url_with_decorator directly as a tool
 
