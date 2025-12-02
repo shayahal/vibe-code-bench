@@ -107,7 +107,7 @@ class LangChainOrchestrator:
             verbose: Enable verbose logging
         """
         self.llm = llm or ChatOpenAI(
-            model="gpt-4-turbo-preview",
+            model="gpt-3.5-turbo",
             temperature=temperature
         )
         self.max_iterations = max_iterations

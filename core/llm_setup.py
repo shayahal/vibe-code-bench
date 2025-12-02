@@ -45,7 +45,7 @@ def initialize_llm(
                 "OpenRouter API key required. Set OPENROUTER_API_KEY env var "
                 "or pass api_key parameter."
             )
-        default_model = "anthropic/claude-3.5-sonnet"
+        default_model = "openai/gpt-3.5-turbo"
         model_name = model_name or default_model
         
         if ChatOpenAI is None:
@@ -73,7 +73,7 @@ def initialize_llm(
                 "Anthropic API key required. Set ANTHROPIC_API_KEY env var "
                 "or pass api_key parameter."
             )
-        default_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+        default_model = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
         model_name = model_name or default_model
         
         # Check if custom base URL is provided (for custom endpoints like yovy.app)
@@ -119,7 +119,7 @@ def initialize_llm(
                 "OpenAI API key required. Set OPENAI_API_KEY env var "
                 "or pass api_key parameter."
             )
-        default_model = "gpt-4"
+        default_model = "gpt-3.5-turbo"
         model_name = model_name or default_model
         
         if ChatOpenAI is None:
