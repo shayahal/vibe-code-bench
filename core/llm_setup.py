@@ -59,7 +59,7 @@ def initialize_llm(
             temperature=temperature,
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
-            max_tokens=1024,  # Limit tokens to stay within credit limits
+            max_tokens=100,  # Very low limit to stay within credit limits (user has ~140 tokens)
             default_headers={
                 "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
                 "X-Title": "Red-Team Agent"
@@ -73,7 +73,7 @@ def initialize_llm(
                 "Anthropic API key required. Set ANTHROPIC_API_KEY env var "
                 "or pass api_key parameter."
             )
-        default_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+        default_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet")
         model_name = model_name or default_model
         
         # Check if custom base URL is provided (for custom endpoints like yovy.app)
