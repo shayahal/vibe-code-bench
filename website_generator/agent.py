@@ -9,17 +9,21 @@ import os
 import logging
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 from dotenv import load_dotenv
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from core.llm_setup import initialize_llm
 from core.run_directory import setup_run_directory
 from core.logging_setup import setup_file_logging
-from .prompts import get_prompt, PROMPT_TEMPLATES
+from website_generator.prompts import get_prompt, PROMPT_TEMPLATES
 
 # Load environment variables
 load_dotenv()

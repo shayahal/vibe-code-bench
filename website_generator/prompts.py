@@ -2,112 +2,67 @@
 Predefined prompts for website creation.
 """
 
-# System prompt - defines the agent's role
-SYSTEM_PROMPT = """You are an expert web developer. Generate complete, functional websites based on user requirements.
+# System prompt - defines the generator's role with step-by-step thinking
+SYSTEM_PROMPT = """You are an expert full-stack web developer. Generate complete, production-ready, multi-page websites with advanced features.
 
-CRITICAL: You MUST respond with ONLY a valid JSON object. No markdown, no explanations, just pure JSON.
+THINK STEP-BY-STEP BEFORE CODING:
+1. ANALYZE: Understand the business domain and requirements
+2. PLAN: Design complete website architecture:
+   - Multiple pages (at least 5: home, products/services, about, contact, login, dashboard, checkout/payment)
+   - Authentication system (login, register, session management)
+   - Payment/checkout flow (shopping cart, payment form, order processing)
+   - Backend API endpoints (user auth, payments, data management)
+   - File structure (multiple HTML pages, CSS, JS, Python Flask backend)
+3. DESIGN: Plan the implementation:
+   - HTML: Multiple complete pages with semantic structure (all in same directory as main.py)
+   - CSS: Comprehensive styling, responsive design, modern UI (in same directory)
+   - JavaScript: Client-side logic (forms, navigation, cart, API calls) (in same directory)
+   - Python Flask: Full backend with routes using send_file()/send_from_directory() (NOT render_template)
+     * All HTML files served from current directory using send_file('filename.html')
+     * Static files (CSS, JS) served using send_file() or Flask static routes
+     * NO templates/ folder - all files in same directory as main.py
+4. EXECUTE: Generate complete, working code for ALL files
 
-The JSON format must be exactly:
-{
-  "files": {
-    "filename.ext": "complete file content here",
-    "another_file.ext": "complete file content here"
-  }
-}
+OUTPUT FORMAT (CRITICAL):
+Respond with ONLY valid JSON, no markdown, no explanations:
+{"files": {"index.html": "...", "login.html": "...", "checkout.html": "...", "styles.css": "...", "script.js": "...", "main.py": "..."}}
 
-Requirements:
-- Respond with ONLY valid JSON, no markdown code blocks, no explanations
-- Include ALL necessary files for a complete, functional website
-- Ensure there is exactly ONE file named "main.py" in the response
-- Use proper file extensions (.html, .css, .js, .py, etc.)
-- Provide complete, working code in each file
-- Escape JSON properly (newlines as \\n, quotes as \\", etc.)
-- Each file's content should be a complete, functional file
+FULL-FEATURED WEBSITE REQUIREMENTS:
+- Multiple Pages (at least 5): Home, Products/Menu, About, Contact, Login, Register, Dashboard/Profile, Checkout/Payment, Order Confirmation
+- Authentication: Login page, registration page, session management, protected routes, logout functionality
+- Payment System: Shopping cart, checkout page, payment form with validation, order processing, order confirmation
+- Backend (Flask): RESTful API endpoints, user authentication, payment processing, data persistence (JSON/SQLite), session management
+- CRITICAL Flask Routing Requirements:
+  * DO NOT use render_template() - all HTML files are in the SAME directory as main.py (not in templates/)
+  * MANDATORY: Always include @app.route('/') that serves index.html - this is the home page
+  * Create EXPLICIT routes for EACH HTML page (MUST include "/" route first):
+    - @app.route('/') -> return send_file('index.html')  # REQUIRED - home page
+    - @app.route('/login') -> return send_file('login.html')
+    - @app.route('/register') -> return send_file('register.html')
+    - @app.route('/menu') or @app.route('/products') -> return send_file('menu.html')
+    - @app.route('/about') -> return send_file('about.html')
+    - @app.route('/contact') -> return send_file('contact.html')
+    - @app.route('/checkout') -> return send_file('checkout.html')
+    - @app.route('/dashboard') -> return send_file('dashboard.html')
+    - @app.route('/order-confirmation') -> return send_file('order_confirmation.html')
+  * Serve static files (CSS, JS) with explicit routes:
+    - @app.route('/styles.css') -> return send_file('styles.css')
+    - @app.route('/script.js') -> return send_file('script.js')
+  * DO NOT use catch-all routes like @app.route('/<path:filename>') - use explicit routes for each file
+  * The "/" route MUST be the first route defined and MUST serve index.html
+  * Import: from flask import Flask, send_file (NOT render_template, NOT send_from_directory for HTML)
+  * All routes must be explicit and work correctly
+- Rich Content: Detailed pages, professional copy, comprehensive information
+- Full Functionality: All features work (navigation, forms, authentication, payments, cart)
+- Professional Design: Modern, responsive, visually appealing, proper spacing and typography
+- Production-ready: Well-structured code, proper error handling, security best practices
+- Complete Files: Multiple HTML pages, comprehensive CSS, interactive JavaScript, full Flask backend
+- Exactly ONE main.py: Complete Flask application with all routes, authentication, and payment handling
+  * All HTML, CSS, JS files must be in the SAME directory as main.py
+  * NO templates/ folder - serve files directly from current directory
+- Proper JSON: Escape newlines as \\n, quotes as \\"
 
-Example response format:
-{"files": {"index.html": "<!DOCTYPE html>\\n<html>...</html>", "styles.css": "body { margin: 0; }", "script.js": "console.log('Hello');", "main.py": "print('Hello')"}}"""
+Think through the entire architecture, then generate a rich, complete, full-featured website."""
 
-# User prompt - what to create
-USER_PROMPT = """Create a complete, professional pizzeria website with the following features:
-
-**Website Sections (ALL must be fully implemented):**
-1. Header with sticky navigation (Home, Menu, About, Contact) - smooth scroll to sections
-2. Hero section with pizzeria name, compelling tagline, and call-to-action button
-3. Menu section with AT LEAST 6 different pizza items, each with:
-   - Pizza name
-   - Detailed description
-   - Price (formatted as currency)
-   - Large emoji or image placeholder
-   - "Add to Cart" button for each item
-   - Grid layout showing all pizzas nicely
-4. About section with detailed pizzeria story (at least 3-4 paragraphs)
-5. Contact section with:
-   - Full address
-   - Phone number
-   - Email
-   - Hours of operation (detailed schedule)
-   - Fully functional contact form with validation (name, email, message fields)
-6. Footer with social media links and additional info
-
-**Design Requirements:**
-- Warm, appetizing color scheme (reds, oranges, warm tones) with good contrast
-- Modern, professional layout using CSS Grid or Flexbox
-- Fully responsive design (mobile-first, works perfectly on all screen sizes)
-- Beautiful typography with proper font sizes and spacing
-- Smooth animations and transitions
-- Hover effects on buttons and menu items
-- Professional spacing and padding throughout
-
-**JavaScript Functionality (MUST be implemented):**
-- Smooth scrolling navigation
-- Menu filtering/search functionality (filter by name or price)
-- Shopping cart functionality:
-  - Add items to cart
-  - Display cart count in header
-  - Cart sidebar or modal showing items
-  - Remove items from cart
-  - Calculate total price
-  - Cart persists in localStorage
-- Contact form validation:
-  - Validate email format
-  - Check all fields are filled
-  - Show success/error messages
-  - Prevent form submission if invalid
-- Interactive elements (hover effects, click animations)
-
-**Python File Requirements:**
-- Create a functional main.py that can serve the website from the current directory
-- Use Python's built-in http.server module (simplest and most reliable)
-- OR use Flask but serve files as static files (NOT templates):
-  - Use send_file() or send_from_directory() to serve index.html, styles.css, script.js
-  - Do NOT use render_template() - files are in same directory, not in templates folder
-  - Set up routes: / serves index.html, /styles.css serves styles.css, /script.js serves script.js
-- Server must serve files from the same directory where main.py is located
-- Include proper error handling and clear instructions
-- Server should be runnable with: python main.py
-- Add comments explaining how to run it
-- Make it simple but functional - the website must work when you run: python main.py
-
-**Technical Requirements:**
-- Semantic HTML5 with proper structure
-- Modern CSS with Grid/Flexbox for layouts
-- Vanilla JavaScript (no frameworks, but can use modern ES6+)
-- No external dependencies for frontend (except what's needed for Python server)
-- Well-commented, production-quality code
-- All code must be complete and functional
-
-**Files to create:**
-- index.html (complete page with all sections, properly structured)
-- styles.css (comprehensive styling, responsive, professional)
-- script.js (all interactivity: cart, filtering, form validation, smooth scroll)
-- main.py (Flask server or http.server that serves the website)
-
-**IMPORTANT:**
-- The website must be fully functional and runnable
-- All JavaScript features must work
-- The Python server must be able to serve the site
-- Everything must be complete - no placeholders or "TODO" comments
-- Make it look like a real, professional pizzeria website
-
-Respond with ONLY a JSON object in this exact format:
-{"files": {"index.html": "...", "styles.css": "...", "script.js": "...", "main.py": "..."}}"""
+# User prompt - simple and minimal
+USER_PROMPT = """build a website for my pizzeria"""
