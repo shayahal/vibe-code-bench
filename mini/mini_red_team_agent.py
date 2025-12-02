@@ -3,7 +3,7 @@ Mini Red Team Agent
 
 A simple CLI-based agent that:
 - Takes a URL as input
-- Uses Claude Mini (claude-3-haiku) 
+- Uses Claude Mini (anthropic/claude-3-haiku) via OpenRouter
 - Has one browsing tool to fetch the URL
 - Returns the first 3 lines from the website
 """
@@ -24,11 +24,11 @@ load_dotenv()
 
 # Try importing LangChain
 try:
-    from langchain_anthropic import ChatAnthropic
+    from langchain_openai import ChatOpenAI
     from langchain.agents import create_agent
     from langchain_core.tools import StructuredTool
 except ImportError:
-    print("Error: langchain-anthropic is required. Install with: pip install langchain-anthropic")
+    print("Error: langchain-openai is required. Install with: pip install langchain-openai")
     sys.exit(1)
 
 # Import LangFuse (required) - LangChain integration
@@ -42,7 +42,7 @@ except ImportError:
 
 
 def generate_run_report(
-    llm: ChatAnthropic,
+    llm: ChatOpenAI,
     langfuse_client: Langfuse,
     url: str,
     output: str,
@@ -78,7 +78,7 @@ def generate_run_report(
 Run Details:
 - URL browsed: {url}
 - Execution time: {execution_time:.2f} seconds
-- Model used: claude-3-haiku-20240307
+- Model used: anthropic/claude-3-haiku (via OpenRouter)
 - Timestamp: {datetime.now().isoformat()}
 
 Agent Output:
@@ -100,7 +100,7 @@ Please generate a detailed markdown report that includes:
    - Breakdown of time spent (if available)
 
 4. **Cost Analysis**
-   - Model used: claude-3-haiku-20240307
+   - Model used: anthropic/claude-3-haiku (via OpenRouter)
    - Estimated cost (note: actual costs are tracked in LangFuse dashboard)
    - Token usage (if available from trace data)
 
@@ -144,7 +144,7 @@ Format the report as clean markdown with proper headers and sections."""
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
 **Target URL:** {url}  
 **Execution Time:** {execution_time:.2f} seconds  
-**Model:** claude-3-haiku-20240307
+**Model:** anthropic/claude-3-haiku (via OpenRouter)
 
 ## Summary
 
@@ -157,11 +157,11 @@ The agent successfully browsed the URL {url} and extracted the first 3 lines of 
 ## Execution Details
 
 - **Total execution time:** {execution_time:.2f} seconds
-- **Model:** claude-3-haiku-20240307 (Claude Mini)
+- **Model:** anthropic/claude-3-haiku (via OpenRouter)
 
 ## Cost Analysis
 
-- **Model:** claude-3-haiku-20240307
+- **Model:** anthropic/claude-3-haiku (via OpenRouter)
 - **Cost:** Check LangFuse dashboard for detailed cost breakdown
 - **Token usage:** Available in LangFuse trace data
 
@@ -230,7 +230,7 @@ def main():
     parser.add_argument(
         "--api-key",
         type=str,
-        help="Anthropic API key (or set ANTHROPIC_API_KEY env var)"
+        help="OpenRouter API key (or set OPENROUTER_API_KEY env var)"
     )
     
     args = parser.parse_args()
@@ -268,18 +268,23 @@ def main():
         sys.exit(1)
     
     # Get API key
-    api_key = args.api_key or os.getenv("ANTHROPIC_API_KEY")
+    api_key = args.api_key or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        print("Error: ANTHROPIC_API_KEY not found. Set it as env var or use --api-key")
+        print("Error: OPENROUTER_API_KEY not found. Set it as env var or use --api-key")
         sys.exit(1)
     
-    # Initialize Claude Mini (claude-3-haiku is the mini/fast model)
+    # Initialize Claude Mini via OpenRouter (anthropic/claude-3-haiku is the mini/fast model)
     try:
-        llm = ChatAnthropic(
-            model="claude-3-haiku-20240307",  # Claude Mini
+        llm = ChatOpenAI(
+            model="anthropic/claude-3-haiku",  # Claude Mini via OpenRouter
             api_key=api_key,
             temperature=0.7,
             max_tokens=200,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
+                "X-Title": "Mini Red-Team Agent"
+            },
             callbacks=[langfuse_handler]
         )
     except Exception as e:
@@ -337,7 +342,8 @@ When the user provides a URL, use the browse_url tool to fetch it and return the
                 "callbacks": [langfuse_handler],
                 "metadata": {
                     "url": args.url,
-                    "model": "claude-3-haiku-20240307",
+                    "model": "anthropic/claude-3-haiku",
+                    "provider": "openrouter",
                     "timestamp": datetime.now().isoformat()
                 }
             }
@@ -389,7 +395,6 @@ When the user provides a URL, use the browse_url tool to fetch it and return the
         
         # Fallback: directly call the tool
         print("\nFalling back to direct tool call...")
-        from tools import browse_url
         result = browse_url(args.url)
         print("\nResult:")
         print("-" * 60)
