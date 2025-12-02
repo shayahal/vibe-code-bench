@@ -28,6 +28,9 @@ from .prompts import SYSTEM_PROMPT, USER_PROMPT
 # Load environment variables
 load_dotenv()
 
+# Configure root logger for early error handling
+logger = logging.getLogger(__name__)
+
 # Configure logging - same as red team agent
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -246,6 +249,7 @@ def main():
         sys.exit(1)
     
     logger.info(f"Initializing LLM (provider: {provider}, model: {cheap_model})...")
+    logger.debug("About to call initialize_llm...")
     
     try:
         llm, model_name = initialize_llm(
@@ -254,16 +258,23 @@ def main():
             temperature=0.7,
             api_key=api_key
         )
+        logger.debug("initialize_llm returned successfully")
         # Increase max_tokens for website generation (need more tokens for full website)
         if hasattr(llm, 'max_tokens'):
+            logger.debug(f"Setting max_tokens to 8000 (was: {llm.max_tokens})")
             llm.max_tokens = 8000  # Increase for website generation
         logger.info(f"LLM initialized: {model_name}")
+        logger.debug(f"LLM object type: {type(llm)}")
     except Exception as e:
-        logger.error(f"Failed to initialize LLM: {e}")
+        logger.error(f"Failed to initialize LLM: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return 1
     
     # Step 3: Send prompts to LLM
     logger.info("Sending prompts to LLM...")
+    logger.debug(f"System prompt preview: {system_prompt[:100]}...")
+    logger.debug(f"User prompt: {user_prompt}")
     
     # Track start time for execution duration
     start_time = time.time()
@@ -274,6 +285,10 @@ def main():
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt)
         ]
+        
+        logger.info("Invoking LLM (this may take a while for large responses)...")
+        # Flush immediately so user sees the message
+        sys.stdout.flush()
         
         # Invoke LLM with LangFuse callback handler if available
         # The handler automatically captures:
@@ -305,7 +320,9 @@ def main():
         logger.info(f"Received response ({len(response_text)} chars) in {execution_time:.2f}s")
         
     except Exception as e:
-        logger.error(f"LLM call failed: {e}")
+        logger.error(f"LLM call failed: {e}", exc_info=True)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return 1
     
     # Step 4: Parse JSON response
@@ -361,8 +378,29 @@ def main():
     logger.info(f"  - Website: {output_dir}")
     logger.info("=" * 60)
     
+    # Flush all logging handlers to ensure logs are written
+    for handler in logging.getLogger().handlers:
+        handler.flush()
+    
+    # Flush stdout/stderr to ensure output appears immediately
+    sys.stdout.flush()
+    sys.stderr.flush()
+    
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        exit_code = main()
+        # Final flush before exit
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
+        sys.exit(130)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.exit(1)

@@ -60,6 +60,7 @@ def initialize_llm(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             max_tokens=100,  # Very low limit to stay within credit limits (user has ~140 tokens)
+            timeout=60,  # 60 second timeout for API calls
             default_headers={
                 "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
                 "X-Title": "Red-Team Agent"
