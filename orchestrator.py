@@ -113,7 +113,7 @@ class LangChainOrchestrator:
         self.max_iterations = max_iterations
         self.verbose = verbose
         
-        logger.info(f"Initializing LangChainOrchestrator - Max iterations: {max_iterations}, Verbose: {verbose}")
+        logger.debug(f"Initializing LangChainOrchestrator - Max iterations: {max_iterations}, Verbose: {verbose}")
         
         # Agent registry: name -> AgentExecutor
         self.agents: Dict[str, AgentExecutor] = {}
@@ -169,10 +169,8 @@ class LangChainOrchestrator:
             "tools": tools
         }
         
-        logger.info(f"Registered agent: {name} with {len(tools)} tools - {description or 'No description'}")
-        
-        if self.verbose:
-            print(f"✓ Registered agent: {name}")
+        logger.debug(f"Registered agent: {name} with {len(tools)} tools - {description or 'No description'}")
+
     
     def create_task(
         self,
@@ -203,9 +201,6 @@ class LangChainOrchestrator:
         self.task_queue.append(task_id)
         
         logger.info(f"Created task: {task_id} - Description: {description[:100]}... - Agent: {agent_name or 'auto-select'}")
-        
-        if self.verbose:
-            print(f"✓ Created task: {task_id} - {description}")
         
         return task_id
     
@@ -241,7 +236,7 @@ class LangChainOrchestrator:
                 logger.error(f"Agent {agent_name} not found for task {task_id}")
                 raise ValueError(f"Agent {agent_name} not found")
             
-            logger.info(f"Selected agent '{agent_name}' for task {task_id}")
+            logger.debug(f"Selected agent '{agent_name}' for task {task_id}")
             
             agent_info = self.agents[agent_name]
             agent_executor = agent_info["executor"]
@@ -260,9 +255,7 @@ class LangChainOrchestrator:
                 logger.debug(f"Added shared state to task {task_id}: {len(self.shared_state)} items")
             
             # Execute agent
-            logger.info(f"Invoking agent '{agent_name}' executor for task {task_id}")
-            if self.verbose:
-                print(f"→ Executing task {task_id} with agent {agent_name}")
+            logger.debug(f"Invoking agent '{agent_name}' executor for task {task_id}")
             
             result = await agent_executor.ainvoke({
                 "input": input_text,
@@ -280,9 +273,6 @@ class LangChainOrchestrator:
             self.conversation_history.append(AIMessage(content=task.result))
             logger.debug(f"Updated conversation history - Total messages: {len(self.conversation_history)}")
             
-            if self.verbose:
-                print(f"✓ Task {task_id} completed")
-            
             return task.result
             
         except Exception as e:
@@ -292,9 +282,6 @@ class LangChainOrchestrator:
             
             logger.error(f"Task {task_id} failed: {str(e)}")
             logger.exception(e)
-            
-            if self.verbose:
-                print(f"✗ Task {task_id} failed: {str(e)}")
             
             raise
     
@@ -316,12 +303,12 @@ class LangChainOrchestrator:
         
         for name, info in self.agents.items():
             if name.lower() in description_lower:
-                logger.info(f"Auto-selected agent '{name}' based on description keyword match")
+                logger.debug(f"Auto-selected agent '{name}' based on description keyword match")
                 return name
         
         # Default to first agent
         default_agent = list(self.agents.keys())[0]
-        logger.info(f"Auto-selected default agent '{default_agent}' (no keyword match found)")
+        logger.debug(f"Auto-selected default agent '{default_agent}' (no keyword match found)")
         return default_agent
     
     async def execute_tasks(
@@ -376,7 +363,7 @@ class LangChainOrchestrator:
     
     def set_shared_state(self, key: str, value: Any) -> None:
         """Set a value in shared state."""
-        logger.info(f"Setting shared state: {key} = {str(value)[:100]}...")
+        logger.debug(f"Setting shared state: {key} = {str(value)[:100]}...")
         self.shared_state[key] = value
     
     def get_shared_state(self, key: str, default: Any = None) -> Any:
@@ -411,7 +398,7 @@ class LangChainOrchestrator:
         """Clear conversation history."""
         message_count = len(self.conversation_history)
         self.conversation_history = []
-        logger.info(f"Cleared conversation history - Removed {message_count} messages")
+        logger.debug(f"Cleared conversation history - Removed {message_count} messages")
     
     def get_callback_events(self) -> List[Dict[str, Any]]:
         """Get all callback events."""
