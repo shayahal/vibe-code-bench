@@ -122,39 +122,32 @@ def setup_file_logging(run_dir: Path) -> None:
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # DEBUG log - DEBUG level only (most verbose, includes function names and line numbers)
-    debug_handler = logging.FileHandler(logs_dir / "debug.log", mode='w')
+    # DEBUG log - DEBUG and above (most verbose)
+    debug_handler = logging.FileHandler(logs_dir / "agent.debug", mode='w')
     debug_handler.setLevel(logging.DEBUG)
     debug_handler.setFormatter(detailed_formatter)
-    debug_handler.addFilter(lambda record: record.levelno == logging.DEBUG)
     logger.addHandler(debug_handler)
     
-    # INFO log - INFO level only (normal operation)
-    info_handler = logging.FileHandler(logs_dir / "info.log", mode='w')
+    # INFO log - INFO and above (normal operation + errors)
+    info_handler = logging.FileHandler(logs_dir / "agent.info", mode='w')
     info_handler.setLevel(logging.INFO)
     info_handler.setFormatter(simple_formatter)
-    info_handler.addFilter(lambda record: record.levelno == logging.INFO)
     logger.addHandler(info_handler)
     
-    # WARNING log - WARNING level only (unexpected conditions, security issues)
-    warning_handler = logging.FileHandler(logs_dir / "warnings.log", mode='w')
+    # WARNING log - WARNING and above (security issues, errors)
+    warning_handler = logging.FileHandler(logs_dir / "agent.warning", mode='w')
     warning_handler.setLevel(logging.WARNING)
     warning_handler.setFormatter(simple_formatter)
-    warning_handler.addFilter(lambda record: record.levelno == logging.WARNING)
     logger.addHandler(warning_handler)
     
     # ERROR log - ERROR and CRITICAL only (failures, exceptions)
-    error_handler = logging.FileHandler(logs_dir / "errors.log", mode='w')
+    error_handler = logging.FileHandler(logs_dir / "agent.error", mode='w')
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(detailed_formatter)
-    error_handler.addFilter(lambda record: record.levelno >= logging.ERROR)
     logger.addHandler(error_handler)
     
-    # Combined log - all messages (for convenience)
-    all_handler = logging.FileHandler(logs_dir / "agent.log", mode='w')
-    all_handler.setLevel(logging.DEBUG)
-    all_handler.setFormatter(simple_formatter)
-    logger.addHandler(all_handler)
+    # Ensure the logger captures everything so handlers can filter it
+    logger.setLevel(logging.DEBUG)
     
     logger.info(f"Logging configured - separate log files created in: {logs_dir}")
     logger.debug("DEBUG logging enabled with detailed formatter")
@@ -227,14 +220,14 @@ class RedTeamAgent:
         self.session.headers.update(self.headers)
         self.session.cookies.update(self.cookies)
         
-        logger.info(f"Created session with {len(self.headers)} headers and {len(self.cookies)} cookies")
+        logger.debug(f"Created session with {len(self.headers)} headers and {len(self.cookies)} cookies")
         
         # Initialize trail logging
         self._initialize_trail_logging(target_url, model_name)
         
         # Create tools and agent
         self.tools, self.tool_functions = self._create_tools()
-        logger.info(f"Created {len(self.tools)} essential tools for the agent")
+        logger.debug(f"Created {len(self.tools)} essential tools for the agent")
         
         self.agent = self._create_agent()
         logger.info("RedTeamAgent initialized successfully")
@@ -511,7 +504,7 @@ Note: Advanced tools (network scanning, AD tools, password cracking, etc.) are a
             # Quick test with minimal tokens
             test_response = self.llm.invoke("OK")
             if test_response and hasattr(test_response, 'content'):
-                logger.info("✓ LLM connection test successful")
+                logger.debug("✓ LLM connection test successful")
                 return True
             return False
         except Exception as e:
@@ -829,25 +822,25 @@ Call generate_report now to complete the security assessment.""")]
         logger.info(f"Testing single URL: {url} (test_type: {test_type})")
         results = {}
         if test_type in ["xss", "both"]:
-            logger.info(f"Running XSS test on {url}")
+            logger.debug(f"Running XSS test on {url}")
             try:
                 result = self.agent.invoke({
                     "messages": [("human", f"Test this URL for XSS vulnerabilities: {url}")]
                 })
                 results["xss"] = result
-                logger.info(f"XSS test completed for {url}")
+                logger.debug(f"XSS test completed for {url}")
             except Exception as e:
                 logger.error(f"Error during XSS test on {url}: {str(e)}")
                 results["xss"] = {"error": str(e)}
         
         if test_type in ["sql", "both"]:
-            logger.info(f"Running SQL injection test on {url}")
+            logger.debug(f"Running SQL injection test on {url}")
             try:
                 result = self.agent.invoke({
                     "messages": [("human", f"Test this URL for SQL injection vulnerabilities: {url}")]
                 })
                 results["sql"] = result
-                logger.info(f"SQL injection test completed for {url}")
+                logger.debug(f"SQL injection test completed for {url}")
             except Exception as e:
                 logger.error(f"Error during SQL injection test on {url}: {str(e)}")
                 results["sql"] = {"error": str(e)}
@@ -933,7 +926,7 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        help="Model to use (defaults based on provider: openrouter='anthropic/claude-3.5-sonnet', anthropic='claude-3-5-sonnet-20241022', openai='gpt-4')"
+        help="Model to use (defaults based on provider: openrouter='openai/gpt-3.5-turbo', anthropic='claude-3-haiku-20240307', openai='gpt-3.5-turbo')"
     )
     parser.add_argument(
         "--scenario",
@@ -944,7 +937,7 @@ def main():
         "--output",
         type=str,
         help="Output file for the report",
-        default="red_team_report.md"
+        default=None
     )
     parser.add_argument(
         "--headers",
@@ -957,10 +950,10 @@ def main():
     # Create run directory with unique timestamp ID
     run_dir = setup_run_directory()
     run_id = run_dir.name
-    print(f"\n{'='*60}")
-    print(f"Starting Red-Team Run: {run_id}")
-    print(f"Run Directory: {run_dir}")
-    print(f"{'='*60}\n")
+    logger.info("=" * 60)
+    logger.info(f"Starting Red-Team Run: {run_id}")
+    logger.info(f"Run Directory: {run_dir}")
+    logger.info("=" * 60)
     
     # Set up file logging
     setup_file_logging(run_dir)
@@ -971,13 +964,13 @@ def main():
         try:
             headers = json.loads(args.headers)
         except json.JSONDecodeError:
-            print("Warning: Invalid JSON for headers, ignoring")
+            logger.warning("Warning: Invalid JSON for headers, ignoring")
     
     # Initialize agent
-    print(f"Initializing Web Security Red-Teaming Agent for: {args.url}")
-    print(f"Using provider: {args.provider}")
+    logger.info(f"Initializing Web Security Red-Teaming Agent for: {args.url}")
+    logger.info(f"Using provider: {args.provider}")
     if args.model:
-        print(f"Using model: {args.model}")
+        logger.info(f"Using model: {args.model}")
     
     agent = RedTeamAgent(
         target_url=args.url,
@@ -989,12 +982,12 @@ def main():
     
     # Run tests
     if args.scenario:
-            print(f"\nRunning single test: {args.scenario}")
+            logger.info(f"Running single test: {args.scenario}")
             try:
                 result = agent.agent.invoke({
                     "messages": [("human", args.scenario)]
                 })
-                print(f"\nResult: {result}")
+                logger.debug(f"Result: {result}")
             except Exception as e:
                 error_str = str(e)
                 # Check for 402 error (insufficient credits) from OpenRouter
@@ -1010,9 +1003,9 @@ def main():
                     except Exception as retry_error:
                         print(f"\nError (even after switching to Anthropic): {retry_error}")
                 else:
-                    print(f"\nError: {e}")
+                    logger.error(f"Error: {e}")
     else:
-        print("\nRunning comprehensive web security test suite...")
+        logger.info("Running comprehensive web security test suite...")
         try:
             report = agent.run_test_suite()
         except Exception as e:
@@ -1059,15 +1052,15 @@ def main():
                 with open(args.output, "w") as f:
                     f.write(report)
             
-            print(f"\n{'='*60}")
-            print(f"Reports saved to:")
-            print(f"  - Security Report: {run_report_path}")
-            print(f"  - Detailed Action Report: {run_dir / 'reports' / 'detailed_action_report.md'}")
-            print(f"  - JSON Report: {run_dir / 'reports' / 'red_team_report.json'}")
-            print(f"  - Action Trail: {run_dir / 'reports' / 'trail.jsonl'}")
+            logger.info("=" * 60)
+            logger.info("Reports saved to:")
+            logger.info(f"  - Security Report: {run_report_path}")
+            logger.info(f"  - Detailed Action Report: {run_dir / 'reports' / 'detailed_action_report.md'}")
+            logger.info(f"  - JSON Report: {run_dir / 'reports' / 'red_team_report.json'}")
+            logger.info(f"  - Action Trail: {run_dir / 'reports' / 'trail.jsonl'}")
             if Path(args.output) != run_report_path:
-                print(f"  - Specified location: {args.output}")
-            print(f"{'='*60}")
+                logger.info(f"  - Specified location: {args.output}")
+            logger.info("=" * 60)
         else:
             # Default: save to run directory
             report_filename = f"security_report_{run_id}.md"
@@ -1075,13 +1068,13 @@ def main():
             with open(run_report_path, "w") as f:
                 f.write(report)
             
-            print(f"\n{'='*60}")
-            print(f"Reports saved to:")
-            print(f"  - Security Report: {run_report_path}")
-            print(f"  - Detailed Action Report: {run_dir / 'reports' / 'detailed_action_report.md'}")
-            print(f"  - JSON Report: {run_dir / 'reports' / 'red_team_report.json'}")
-            print(f"  - Action Trail: {run_dir / 'reports' / 'trail.jsonl'}")
-            print(f"{'='*60}")
+            logger.info("=" * 60)
+            logger.info("Reports saved to:")
+            logger.info(f"  - Security Report: {run_report_path}")
+            logger.info(f"  - Detailed Action Report: {run_dir / 'reports' / 'detailed_action_report.md'}")
+            logger.info(f"  - JSON Report: {run_dir / 'reports' / 'red_team_report.json'}")
+            logger.info(f"  - Action Trail: {run_dir / 'reports' / 'trail.jsonl'}")
+            logger.info("=" * 60)
         
         # Save run metadata
         metadata = {
@@ -1105,17 +1098,17 @@ def main():
         with open(metadata_path, "w") as f:
             json.dump(metadata, f, indent=2)
         
-        print(f"\nRun Summary:")
-        print(f"  - Run ID: {run_id}")
-        print(f"  - Total tests: {metadata['total_tests']}")
-        print(f"  - Vulnerabilities found: {metadata['vulnerabilities_found']}")
-        print(f"  - Logs: {run_dir / 'logs' / 'agent.log'}")
-        print(f"  - Reports directory: {run_dir / 'reports'}")
-        print(f"    * Security Report (Markdown)")
-        print(f"    * Detailed Action Report (Markdown)")
-        print(f"    * JSON Report")
-        print(f"    * Action Trail (JSONL)")
-        print(f"  - Metadata: {metadata_path}")
+        logger.info("Run Summary:")
+        logger.info(f"  - Run ID: {run_id}")
+        logger.info(f"  - Total tests: {metadata['total_tests']}")
+        logger.info(f"  - Vulnerabilities found: {metadata['vulnerabilities_found']}")
+        logger.info(f"  - Logs: {run_dir / 'logs' / 'agent.debug'}")
+        logger.info(f"  - Reports directory: {run_dir / 'reports'}")
+        logger.info(f"    * Security Report (Markdown)")
+        logger.info(f"    * Detailed Action Report (Markdown)")
+        logger.info(f"    * JSON Report")
+        logger.info(f"    * Action Trail (JSONL)")
+        logger.info(f"  - Metadata: {metadata_path}")
 
 
 if __name__ == "__main__":

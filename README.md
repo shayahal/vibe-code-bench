@@ -359,7 +359,7 @@ python red_team_agent.py --url https://example.com
 python red_team_agent.py \
   --url https://example.com \
   --provider openrouter \
-  --model anthropic/claude-3.5-sonnet \
+  --model openai/gpt-3.5-turbo \
   --scenario "Perform comprehensive security testing including XSS, SQL injection, and directory enumeration"
 ```
 
@@ -388,7 +388,7 @@ from red_team_agent import RedTeamAgent
 agent = RedTeamAgent(
     target_url="https://example.com",
     provider="openrouter",
-    model_name="anthropic/claude-3.5-sonnet",
+    model_name="openai/gpt-3.5-turbo",
     headers={"User-Agent": "SecurityScanner/1.0"}
 )
 
@@ -468,9 +468,9 @@ result = agent.scan_with_nmap("192.168.1.1", scan_type="vuln")
 **Provider Options:**
 - `--provider`: Choose provider: `openrouter` (default), `anthropic`, or `openai`
 - `--model`: Model name (defaults based on provider)
-  - OpenRouter: `anthropic/claude-3.5-sonnet` (default)
-  - Anthropic: `claude-3-5-sonnet-20241022` (default)
-  - OpenAI: `gpt-4` (default)
+  - OpenRouter: `openai/gpt-3.5-turbo` (default)
+  - Anthropic: `claude-3-haiku-20240307` (default)
+  - OpenAI: `gpt-3.5-turbo` (default)
 
 **Other Configuration:**
 - `DEFAULT_TEMPERATURE`: LLM temperature (default: 0.7)
