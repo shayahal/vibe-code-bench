@@ -1,0 +1,15 @@
+Here is the complete, functional website code for a pizzeria:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pizzeria</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Pizzeria</h1>
+        <nav>
+            

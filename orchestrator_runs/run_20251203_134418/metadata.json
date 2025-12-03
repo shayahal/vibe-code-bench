@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-12-03T13:44:28.880327",
+  "template": "default",
+  "prompt_preview": "build a website for my pizzeria",
+  "output_directory": "orchestrator_runs/run_20251203_134418/website",
+  "created_files": [
+    {
+      "name": "index.html",
+      "size": 1833
+    },
+    {
+      "name": "styles.css",
+      "size": 1346
+    },
+    {
+      "name": "script.js",
+      "size": 164
+    },
+    {
+      "name": "main.py",
+      "size": 606
+    }
+  ],
+  "total_files": 4,
+  "status": "success",
+  "method": "simple_llm_call"
+}

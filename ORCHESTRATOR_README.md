@@ -6,11 +6,12 @@ Automated pipeline that builds websites, tests them with the red team agent, and
 
 The orchestrator automates the complete evaluation workflow:
 
-1. **Build Website**: Uses website builder to create a website
+1. **Build Website**: Uses website builder agent to create a website
 2. **Start Server**: Launches Flask server to serve the website locally
 3. **Run Red Team Agent**: Tests the website for vulnerabilities
-4. **Evaluate Findings**: Compares findings against ground truth (20 vulnerabilities)
-5. **Generate Report**: Outputs JSON with all vulnerabilities and found status
+4. **Put Website to Sleep**: Stops the website server after testing
+5. **Evaluate Findings**: Compares findings against ground truth (20 vulnerabilities)
+6. **Generate Report**: Outputs JSON with all vulnerabilities and found status
 
 ## Usage
 
@@ -168,7 +169,12 @@ STEP 3: Running Red Team Agent
   Report saved: orchestrator_runs/run_20251203_133000/red_team_reports/...
 
 ============================================================
-STEP 4: Evaluating Findings
+STEP 4: Putting Website to Sleep
+============================================================
+✓ Website server stopped (put to sleep)
+
+============================================================
+STEP 5: Evaluating Findings
 ============================================================
 ✓ Evaluation completed
   Overall detection rate: 45.00%
@@ -179,7 +185,7 @@ STEP 4: Evaluating Findings
 EVALUATION COMPLETE
 ======================================================================
 Run ID: 20251203_133000
-URL: http://localhost:5000
+URL: fhttp://localhost:5000
 
 Vulnerabilities Found: 9/20
 Detection Rate: 45.00%

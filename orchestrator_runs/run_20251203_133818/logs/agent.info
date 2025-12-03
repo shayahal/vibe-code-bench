@@ -1,0 +1,35 @@
+2025-12-03 13:38:18 - INFO - Logging configured - separate log files created in: orchestrator_runs/run_20251203_133818/logs
+2025-12-03 13:38:18 - INFO - Initialized LLM: anthropic/claude-3-haiku
+2025-12-03 13:38:18 - INFO - ============================================================
+2025-12-03 13:38:18 - INFO - Starting website creation (simple mode)
+2025-12-03 13:38:18 - INFO - ============================================================
+2025-12-03 13:38:18 - INFO - Using template: default
+2025-12-03 13:38:18 - INFO - Prompt length: 1581 characters
+2025-12-03 13:38:18 - INFO - Generating website code with LLM...
+2025-12-03 13:38:19 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-03 13:38:19 - INFO - Generated 281 characters of code
+2025-12-03 13:38:19 - INFO - Parsing code blocks...
+2025-12-03 13:38:19 - WARNING - No code blocks found, attempting fallback parsing...
+2025-12-03 13:38:19 - WARNING - No files parsed from LLM response. Attempting alternative parsing...
+2025-12-03 13:38:19 - ERROR - Failed to parse any code files from LLM response.
+2025-12-03 13:38:19 - ERROR - Response preview (first 500 chars): ```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pizzeria</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Welcome to Pizzeria</h1>
+        <nav>
+            <ul>
+                <li><a href="#">Home
+2025-12-03 13:38:19 - INFO - Writing 1 files...
+2025-12-03 13:38:19 - INFO - Created file: generated_code.txt (281 bytes)
+2025-12-03 13:38:19 - INFO - ============================================================
+2025-12-03 13:38:19 - INFO - Website creation completed!
+2025-12-03 13:38:19 - INFO - Created 1 files
+2025-12-03 13:38:19 - INFO - Output: orchestrator_runs/run_20251203_133818/website
+2025-12-03 13:38:19 - INFO - ============================================================

@@ -1,0 +1,41 @@
+2025-12-03 13:48:12 - root - INFO - setup_file_logging:68 - Logging configured - separate log files created in: orchestrator_runs/run_20251203_134812/logs
+2025-12-03 13:48:12 - root - DEBUG - setup_file_logging:69 - DEBUG logging enabled with detailed formatter
+2025-12-03 13:48:12 - website_generator.agent - INFO - __init__:98 - Initialized LLM: anthropic/claude-3-haiku
+2025-12-03 13:48:12 - website_generator.agent - INFO - create_website:214 - ============================================================
+2025-12-03 13:48:12 - website_generator.agent - INFO - create_website:215 - Starting website creation (simple mode)
+2025-12-03 13:48:12 - website_generator.agent - INFO - create_website:216 - ============================================================
+2025-12-03 13:48:12 - website_generator.agent - INFO - create_website:253 - Using template: default
+2025-12-03 13:48:12 - website_generator.agent - INFO - create_website:254 - Prompt length: 494 characters
+2025-12-03 13:48:12 - website_generator.agent - INFO - create_website:258 - Generating website code with LLM...
+2025-12-03 13:48:12 - openai._base_client - DEBUG - _build_request:482 - Request options: {'method': 'post', 'url': '/chat/completions', 'headers': {'X-Stainless-Raw-Response': 'true'}, 'files': None, 'idempotency_key': 'stainless-python-retry-2e22a55b-f380-4917-937a-f9b69d7f3cda', 'json_data': {'messages': [{'content': 'You are an expert web developer. Generate complete, functional website code.', 'role': 'system'}, {'content': 'build a website for my pizzeria\n\nPlease provide all the code in markdown code blocks with appropriate language tags:\n- Use ```html or ```index.html for HTML files\n- Use ```css or ```styles.css for CSS files  \n- Use ```javascript or ```script.js for JavaScript files\n- Use ```markdown or ```README.md for documentation\n\nExample format:\n```html\n<!DOCTYPE html>\n...\n```\n\n```css\n/* styles */\n...\n```\n\n```javascript\n// script\n...\n```\n\nGenerate all necessary files for a complete, functional website.', 'role': 'user'}], 'model': 'anthropic/claude-3-haiku', 'max_completion_tokens': 100, 'stream': False, 'temperature': 0.7}}
+2025-12-03 13:48:12 - openai._base_client - DEBUG - request:978 - Sending HTTP Request: POST https://openrouter.ai/api/v1/chat/completions
+2025-12-03 13:48:12 - httpcore.connection - DEBUG - trace:47 - connect_tcp.started host='openrouter.ai' port=443 local_address=None timeout=60.0 socket_options=None
+2025-12-03 13:48:12 - httpcore.connection - DEBUG - trace:47 - connect_tcp.complete return_value=<httpcore._backends.sync.SyncStream object at 0x12f9e1010>
+2025-12-03 13:48:12 - httpcore.connection - DEBUG - trace:47 - start_tls.started ssl_context=<ssl.SSLContext object at 0x12ada68d0> server_hostname='openrouter.ai' timeout=60.0
+2025-12-03 13:48:12 - httpcore.connection - DEBUG - trace:47 - start_tls.complete return_value=<httpcore._backends.sync.SyncStream object at 0x12f9160d0>
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - send_request_headers.started request=<Request [b'POST']>
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - send_request_headers.complete
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - send_request_body.started request=<Request [b'POST']>
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - send_request_body.complete
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - receive_response_headers.started request=<Request [b'POST']>
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Date', b'Wed, 03 Dec 2025 11:48:12 GMT'), (b'Content-Type', b'application/json'), (b'Transfer-Encoding', b'chunked'), (b'Connection', b'keep-alive'), (b'Content-Encoding', b'gzip'), (b'Access-Control-Allow-Origin', b'*'), (b'Vary', b'Accept-Encoding'), (b'Permissions-Policy', b'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")'), (b'Referrer-Policy', b'no-referrer, strict-origin-when-cross-origin'), (b'X-Content-Type-Options', b'nosniff'), (b'Server', b'cloudflare'), (b'CF-RAY', b'9a82d5693832163c-TLV')])
+2025-12-03 13:48:12 - httpx - INFO - _send_single_request:1025 - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-03 13:48:12 - httpcore.http11 - DEBUG - trace:47 - receive_response_body.started request=<Request [b'POST']>
+2025-12-03 13:48:13 - httpcore.http11 - DEBUG - trace:47 - receive_response_body.complete
+2025-12-03 13:48:13 - httpcore.http11 - DEBUG - trace:47 - response_closed.started
+2025-12-03 13:48:13 - httpcore.http11 - DEBUG - trace:47 - response_closed.complete
+2025-12-03 13:48:13 - openai._base_client - DEBUG - request:1016 - HTTP Response: POST https://openrouter.ai/api/v1/chat/completions "200 OK" Headers({'date': 'Wed, 03 Dec 2025 11:48:12 GMT', 'content-type': 'application/json', 'transfer-encoding': 'chunked', 'connection': 'keep-alive', 'content-encoding': 'gzip', 'access-control-allow-origin': '*', 'vary': 'Accept-Encoding', 'permissions-policy': 'payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")', 'referrer-policy': 'no-referrer, strict-origin-when-cross-origin', 'x-content-type-options': 'nosniff', 'server': 'cloudflare', 'cf-ray': '9a82d5693832163c-TLV'})
+2025-12-03 13:48:13 - openai._base_client - DEBUG - request:1024 - request_id: None
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:270 - Generated 311 characters of code
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:273 - Parsing code blocks...
+2025-12-03 13:48:13 - website_generator.agent - WARNING - _parse_code_blocks:151 - No code blocks found, attempting fallback parsing...
+2025-12-03 13:48:13 - website_generator.agent - WARNING - create_website:277 - No files parsed from LLM response. Saving raw response...
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:282 - Writing 1 files...
+2025-12-03 13:48:13 - website_generator.agent - INFO - _write_files:190 - Created file: generated_code.txt (311 bytes)
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:306 - ============================================================
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:307 - Website creation completed!
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:308 - Created 1 files
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:309 - Output: orchestrator_runs/run_20251203_134812/website
+2025-12-03 13:48:13 - website_generator.agent - INFO - create_website:310 - ============================================================
+2025-12-03 13:48:13 - urllib3.connectionpool - DEBUG - _new_conn:241 - Starting new HTTP connection (1): localhost:5000
+2025-12-03 13:48:13 - urllib3.connectionpool - DEBUG - _make_request:544 - http://localhost:5000 "GET / HTTP/1.1" 403 0

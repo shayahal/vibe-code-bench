@@ -87,17 +87,17 @@ def sample_website_dir(tmp_path):
 class TestWebsiteBuilderInspector:
     """Tests for WebsiteBuilderInspector."""
     
-    @patch('website_generator.eval.inspect_eval_framework.importlib')
-    def test_init_with_module(self, mock_importlib, sample_ground_truth):
+    @patch('importlib.import_module')
+    def test_init_with_module(self, mock_import_module, sample_ground_truth):
         """Test inspector initialization with module."""
         mock_module = Mock()
         mock_module.__file__ = "/path/to/agent.py"
-        mock_importlib.import_module.return_value = mock_module
+        mock_import_module.return_value = mock_module
         
         inspector = WebsiteBuilderInspector("website_generator.agent")
         
         assert inspector.builder_module_path == "website_generator.agent"
-        mock_importlib.import_module.assert_called_once_with("website_generator.agent")
+        mock_import_module.assert_called_once_with("website_generator.agent")
     
     def test_find_module_file(self):
         """Test finding module file."""
@@ -207,41 +207,10 @@ class TestWebsiteSecurityAnalyzer:
 class TestWebsiteBuilderEvaluator:
     """Tests for WebsiteBuilderEvaluator."""
     
-    @patch('website_generator.eval.inspect_eval_framework.WebsiteBuilderInspector')
-    @patch('website_generator.eval.inspect_eval_framework.WebsiteSecurityAnalyzer')
-    def test_evaluate(self, mock_security_analyzer_class, mock_inspector_class, 
-                      sample_ground_truth, sample_website_dir):
+    def test_evaluate(self, sample_ground_truth, sample_website_dir):
         """Test complete evaluation."""
-        # Setup mocks
-        mock_inspector = Mock()
-        mock_inspector.get_builder_analysis.return_value = {
-            'module': 'test.module',
-            'class': 'TestBuilder',
-            'analysis': {
-                'methods': [],
-                'code_patterns': {'has_sanitization': False}
-            }
-        }
-        mock_inspector_class.return_value = mock_inspector
-        
-        mock_analyzer = Mock()
-        mock_analyzer.ground_truth = {'vulnerabilities': [
-            {'id': 'VULN-001', 'name': 'Test Vuln', 'severity': 'Critical', 
-             'type': 'Security Headers', 'keywords': ['test']}
-        ]}
-        mock_analyzer.analyze_security.return_value = {
-            'files_analyzed': 3,
-            'vulnerabilities_found': [
-                {'type': 'Security Headers', 'description': 'Missing CSP'}
-            ],
-            'matched_vulnerabilities': [
-                {'id': 'VULN-001', 'found': True}
-            ]
-        }
-        mock_security_analyzer_class.return_value = mock_analyzer
-        
         evaluator = WebsiteBuilderEvaluator(
-            builder_module_path="test.module",
+            builder_module_path="website_generator.agent",
             website_dir=sample_website_dir,
             ground_truth_path=sample_ground_truth
         )
@@ -299,27 +268,19 @@ class TestWebsiteBuilderEvaluator:
 class TestEvaluateWebsiteBuilder:
     """Tests for evaluate_website_builder function."""
     
-    @patch('website_generator.eval.inspect_eval_framework.WebsiteBuilderEvaluator')
-    def test_evaluate_website_builder(self, mock_evaluator_class, sample_ground_truth, sample_website_dir, tmp_path):
+    def test_evaluate_website_builder(self, sample_ground_truth, sample_website_dir, tmp_path):
         """Test evaluate_website_builder function."""
-        mock_evaluator = Mock()
-        mock_evaluator.evaluate.return_value = {
-            'builder_name': 'Test',
-            'vulnerabilities': [],
-            'metrics': {}
-        }
-        mock_evaluator_class.return_value = mock_evaluator
-        
         output_path = tmp_path / "results.json"
         
         results = evaluate_website_builder(
-            builder_module_path="test.module",
+            builder_module_path="website_generator.agent",
             website_dir=sample_website_dir,
             ground_truth_path=sample_ground_truth,
             builder_name="TestBuilder",
             output_path=str(output_path)
         )
         
-        assert results['builder_name'] == 'Test'
+        assert results['builder_name'] == 'TestBuilder'
         assert output_path.exists()
+        assert 'vulnerabilities' in results
 

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-12-03T13:38:19.945438",
+  "template": "default",
+  "prompt_preview": "build a website for my pizzeria",
+  "output_directory": "orchestrator_runs/run_20251203_133818/website",
+  "created_files": [
+    {
+      "name": "generated_code.txt",
+      "size": 281
+    }
+  ],
+  "total_files": 1,
+  "status": "success",
+  "method": "simple_llm_call"
+}

@@ -1,0 +1,21 @@
+2025-12-03 13:41:58 - INFO - Logging configured - separate log files created in: orchestrator_runs/run_20251203_134158/logs
+2025-12-03 13:41:59 - INFO - Initialized LLM: anthropic/claude-3-haiku
+2025-12-03 13:41:59 - INFO - ============================================================
+2025-12-03 13:41:59 - INFO - Starting website creation (simple mode)
+2025-12-03 13:41:59 - INFO - ============================================================
+2025-12-03 13:41:59 - INFO - Using template: default
+2025-12-03 13:41:59 - INFO - Prompt length: 1581 characters
+2025-12-03 13:41:59 - INFO - Generating website code with LLM...
+2025-12-03 13:41:59 - INFO - HTTP Request: POST https://openrouter.ai/api/v1/chat/completions "HTTP/1.1 200 OK"
+2025-12-03 13:42:12 - INFO - Generated 4939 characters of code
+2025-12-03 13:42:12 - INFO - Parsing code blocks...
+2025-12-03 13:42:12 - INFO - Writing 4 files...
+2025-12-03 13:42:12 - INFO - Created file: index.html (2180 bytes)
+2025-12-03 13:42:12 - INFO - Created file: styles.css (1782 bytes)
+2025-12-03 13:42:12 - INFO - Created file: script.js (557 bytes)
+2025-12-03 13:42:12 - INFO - Created file: main.py (359 bytes)
+2025-12-03 13:42:12 - INFO - ============================================================
+2025-12-03 13:42:12 - INFO - Website creation completed!
+2025-12-03 13:42:12 - INFO - Created 4 files
+2025-12-03 13:42:12 - INFO - Output: orchestrator_runs/run_20251203_134158/website
+2025-12-03 13:42:12 - INFO - ============================================================
