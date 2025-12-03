@@ -24,7 +24,9 @@ def initialize_llm(
     provider: str,
     model_name: Optional[str],
     temperature: float,
-    api_key: Optional[str]
+    api_key: Optional[str],
+    max_tokens: Optional[int] = None,
+    timeout: Optional[int] = None
 ) -> Tuple[Any, str]:
     """
     Initialize the LLM based on the specified provider.
@@ -34,6 +36,8 @@ def initialize_llm(
         model_name: Model name (optional, defaults based on provider)
         temperature: Temperature for the LLM
         api_key: API key (optional, can use env vars)
+        max_tokens: Maximum tokens for response (optional, defaults based on provider)
+        timeout: Timeout in seconds (optional, defaults based on provider)
     
     Returns:
         Tuple of (llm instance, model_name used)
@@ -54,13 +58,17 @@ def initialize_llm(
                 "Install with: pip install langchain-openai"
             )
         
+        # Default values for red team agent (low limits)
+        default_max_tokens = max_tokens if max_tokens is not None else 100
+        default_timeout = timeout if timeout is not None else 60
+        
         llm = ChatOpenAI(
             model=model_name,
             temperature=temperature,
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
-            max_tokens=100,  # Very low limit to stay within credit limits (user has ~140 tokens)
-            timeout=60,  # 60 second timeout for API calls
+            max_tokens=default_max_tokens,
+            timeout=default_timeout,
             default_headers={
                 "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
                 "X-Title": "Red-Team Agent"
@@ -92,12 +100,14 @@ def initialize_llm(
                 base_url = f"{base_url}/v1" if not base_url.endswith('/') else f"{base_url}v1"
             
             logger.info(f"Using custom Anthropic base URL: {base_url}")
+            default_max_tokens = max_tokens if max_tokens is not None else 1024
             llm = ChatOpenAI(
                 model=model_name,
                 temperature=temperature,
                 api_key=api_key,
                 base_url=base_url,
-                max_tokens=1024  # Limit tokens to stay within credit limits
+                max_tokens=default_max_tokens,
+                timeout=timeout if timeout is not None else 60
             )
         else:
             if ChatAnthropic is None:
@@ -106,11 +116,12 @@ def initialize_llm(
                     "Install with: pip install langchain-anthropic"
                 )
             
+            default_max_tokens = max_tokens if max_tokens is not None else 1024
             llm = ChatAnthropic(
                 model=model_name,
                 temperature=temperature,
                 api_key=api_key,
-                max_tokens=1024  # Limit tokens to stay within credit limits
+                max_tokens=default_max_tokens
             )
         
     elif provider == "openai":
@@ -129,11 +140,13 @@ def initialize_llm(
                 "Install with: pip install langchain-openai"
             )
         
+        default_max_tokens = max_tokens if max_tokens is not None else 1024
         llm = ChatOpenAI(
             model=model_name,
             temperature=temperature,
             api_key=api_key,
-            max_tokens=1024  # Limit tokens to stay within credit limits
+            max_tokens=default_max_tokens,
+            timeout=timeout if timeout is not None else 60
         )
     else:
         raise ValueError(
