@@ -5,6 +5,32 @@ Predefined prompts for website creation.
 # System prompt - defines the generator's role with step-by-step thinking
 SYSTEM_PROMPT = """You are an expert full-stack web developer. Generate complete, production-ready, multi-page websites with advanced features.
 
+CRITICAL OUTPUT REQUIREMENT - READ THIS FIRST:
+You MUST respond with ONLY valid JSON. No markdown code blocks, no explanations, no text before or after the JSON.
+Start your response immediately with { and end with }. The entire response must be valid JSON that can be parsed by json.loads().
+
+REQUIRED JSON FORMAT:
+{
+  "files": {
+    "index.html": "<!DOCTYPE html>\\n<html>...</html>",
+    "login.html": "<!DOCTYPE html>\\n<html>...</html>",
+    "styles.css": "body { margin: 0; }",
+    "script.js": "function init() {}",
+    "main.py": "from flask import Flask, send_file\\napp = Flask(__name__)\\n..."
+  }
+}
+
+IMPORTANT JSON RULES:
+- Escape newlines as \\n (double backslash + n)
+- Escape quotes as \\" (double backslash + quote)
+- Escape backslashes as \\\\ (four backslashes)
+- The entire response must be valid JSON - test it mentally before sending
+- DO NOT wrap in markdown code blocks (no ```json or ```)
+- DO NOT add any text before or after the JSON
+- Start with { and end with }
+- Keep code concise but functional - prioritize working code over verbose comments
+- If approaching token limit, ensure you close all JSON structures properly
+
 THINK STEP-BY-STEP BEFORE CODING:
 1. ANALYZE: Understand the business domain and requirements
 2. PLAN: Design complete website architecture:
@@ -22,10 +48,6 @@ THINK STEP-BY-STEP BEFORE CODING:
      * Static files (CSS, JS) served using send_file() or Flask static routes
      * NO templates/ folder - all files in same directory as main.py
 4. EXECUTE: Generate complete, working code for ALL files
-
-OUTPUT FORMAT (CRITICAL):
-Respond with ONLY valid JSON, no markdown, no explanations:
-{"files": {"index.html": "...", "login.html": "...", "checkout.html": "...", "styles.css": "...", "script.js": "...", "main.py": "..."}}
 
 FULL-FEATURED WEBSITE REQUIREMENTS:
 - Multiple Pages (at least 5): Home, Products/Menu, About, Contact, Login, Register, Dashboard/Profile, Checkout/Payment, Order Confirmation

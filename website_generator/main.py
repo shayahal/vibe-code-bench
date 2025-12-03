@@ -16,6 +16,7 @@ import sys
 import time
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 from dotenv import load_dotenv
 
 # Add parent directory to path for imports
@@ -125,16 +126,31 @@ def parse_json_response(response_text: str) -> dict:
     Returns:
         Dictionary with files
     """
+    if not response_text or len(response_text.strip()) == 0:
+        raise ValueError("Empty response from LLM")
+    
+    # Strip whitespace from start and end
+    response_text = response_text.strip()
+    
     # Try to extract JSON from markdown code blocks
     import re
     json_match = re.search(r'```(?:json)?\s*\n?(\{.*?\})\n?```', response_text, re.DOTALL)
     if json_match:
-        response_text = json_match.group(1)
+        response_text = json_match.group(1).strip()
     
-    # Try to find JSON object in the text
-    json_match = re.search(r'\{.*"files".*\}', response_text, re.DOTALL)
-    if json_match:
-        response_text = json_match.group(0)
+    # If response doesn't start with {, try to find JSON object in the text
+    if not response_text.startswith('{'):
+        json_match = re.search(r'\{.*"files".*\}', response_text, re.DOTALL)
+        if json_match:
+            response_text = json_match.group(0).strip()
+    
+    # Try to fix common JSON issues
+    # Remove trailing commas before closing braces/brackets
+    response_text = re.sub(r',(\s*[}\]])', r'\1', response_text)
+    
+    # Ensure it starts with {
+    if not response_text.startswith('{'):
+        raise ValueError(f"Response does not start with {{. First 100 chars: {response_text[:100]}")
     
     try:
         data = json.loads(response_text)
@@ -144,6 +160,85 @@ def parse_json_response(response_text: str) -> dict:
             # If response is just the files dict directly
             return data
     except json.JSONDecodeError as e:
+        error_str = str(e).lower()
+        
+        # If it's an unterminated string (truncation), try to salvage what we can
+        if 'unterminated' in error_str:
+            logger.warning("Response appears truncated. Attempting to extract complete file entries...")
+            try:
+                # Find the "files" section
+                files_match = re.search(r'"files"\s*:\s*\{', response_text)
+                if files_match:
+                    # Try to find all complete file entries by looking for the pattern:
+                    # "filename": "content" where content ends with a closing quote
+                    # This is a simplified approach - find entries that are complete
+                    files_section = response_text[files_match.end():]
+                    
+                    # Find all file entries with pattern: "filename": "content"
+                    # We'll look for entries that have a closing quote followed by comma or }
+                    file_entries = re.finditer(r'"([^"]+)"\s*:\s*"', files_section)
+                    salvaged_files = {}
+                    
+                    for entry_match in file_entries:
+                        filename = entry_match.group(1)
+                        value_start = entry_match.end()
+                        
+                        # Try to find the matching closing quote (handling escapes)
+                        i = value_start
+                        found_closing = False
+                        while i < len(files_section):
+                            if files_section[i] == '\\':
+                                i += 2  # Skip escaped char
+                                continue
+                            elif files_section[i] == '"':
+                                # Check if followed by comma or }
+                                j = i + 1
+                                while j < len(files_section) and files_section[j] in ' \t\n\r':
+                                    j += 1
+                                if j < len(files_section) and files_section[j] in [',', '}']:
+                                    # Complete entry found
+                                    value = files_section[value_start:i]
+                                    # Unescape the value
+                                    value = value.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                                    salvaged_files[filename] = value
+                                    found_closing = True
+                                    break
+                            i += 1
+                        
+                        if not found_closing:
+                            # This entry is incomplete, stop here
+                            break
+                    
+                    if salvaged_files:
+                        logger.warning(f"Salvaged {len(salvaged_files)} complete files from truncated response")
+                        return salvaged_files
+            except Exception as salvage_error:
+                logger.debug(f"Failed to salvage truncated JSON: {salvage_error}")
+        
+        # Try to extract just the files portion if the error is in escape sequences
+        try:
+            # Look for the "files" key and try to extract its value
+            files_match = re.search(r'"files"\s*:\s*(\{.*?\})', response_text, re.DOTALL)
+            if files_match:
+                files_json = files_match.group(1)
+                # Try to balance braces and extract valid JSON
+                brace_count = 0
+                end_pos = 0
+                for i, char in enumerate(files_json):
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_pos = i + 1
+                            break
+                if end_pos > 0:
+                    files_json = files_json[:end_pos]
+                    files_data = json.loads(files_json)
+                    return files_data
+        except:
+            pass
+        
         logger.error(f"Failed to parse JSON: {e}")
         logger.error(f"Response text (first 500 chars): {response_text[:500]}")
         raise ValueError(f"Invalid JSON response from LLM: {e}")
@@ -189,8 +284,233 @@ def write_files(files: dict, output_dir: Path) -> list:
     return created_files
 
 
+def generate_website(
+    user_prompt: str,
+    output_dir: Path,
+    model_name: Optional[str] = None,
+    provider: str = "openrouter",
+    system_prompt: Optional[str] = None,
+    skip_langfuse: bool = False
+) -> dict:
+    """
+    Generate a website programmatically.
+    
+    Args:
+        user_prompt: The user prompt describing the website to create
+        output_dir: Directory where website files should be saved
+        model_name: Model to use (defaults based on provider)
+        provider: LLM provider ('openrouter', 'anthropic', or 'openai')
+        system_prompt: Custom system prompt (defaults to SYSTEM_PROMPT)
+        skip_langfuse: If True, skip LangFuse initialization (for batch runs)
+    
+    Returns:
+        Dictionary with status and results:
+        {
+            "status": "success" or "error",
+            "output_directory": str,
+            "created_files": list,
+            "total_files": int,
+            "error": str (if status is "error")
+        }
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Use default system prompt if not provided
+    if system_prompt is None:
+        system_prompt = SYSTEM_PROMPT
+    
+    # Initialize LangFuse if not skipped
+    langfuse_client = None
+    langfuse_handler = None
+    langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+    
+    if not skip_langfuse:
+        langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+        langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+        
+        if langfuse_secret_key and langfuse_public_key:
+            try:
+                langfuse_client = Langfuse(
+                    secret_key=langfuse_secret_key,
+                    public_key=langfuse_public_key,
+                    host=langfuse_host
+                )
+                langfuse_handler = LangfuseCallbackHandler()
+                logger.debug(f"LangFuse initialized (host: {langfuse_host})")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LangFuse: {e}")
+                langfuse_client = None
+                langfuse_handler = None
+    
+    # Determine API key based on provider
+    if provider == "openrouter":
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not model_name:
+            model_name = os.getenv("WEBSITE_CREATOR_MODEL", "openai/gpt-3.5-turbo")
+    elif provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not model_name:
+            model_name = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307")
+    elif provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not model_name:
+            model_name = "gpt-3.5-turbo"
+    else:
+        return {
+            "status": "error",
+            "error": f"Unknown provider: {provider}"
+        }
+    
+    if not api_key:
+        return {
+            "status": "error",
+            "error": f"API key not found for provider {provider}"
+        }
+    
+    # Initialize LLM with higher limits for website generation
+    # Use very high token limit to avoid truncation (Claude models can handle up to 4096 tokens output)
+    # For large websites, we need more - use 16000 to be safe
+    try:
+        llm, actual_model_name = initialize_llm(
+            provider=provider,
+            model_name=model_name,
+            temperature=0.7,
+            api_key=api_key,
+            max_tokens=16000,  # Very high limit to avoid truncation for full websites
+            timeout=300  # 5 minutes for large responses
+        )
+        logger.info(f"LLM initialized: {actual_model_name}")
+        logger.info(f"  max_tokens: 16000")
+        logger.info(f"  timeout: 300s")
+    except Exception as e:
+        logger.error(f"Failed to initialize LLM: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "error": f"Failed to initialize LLM: {e}"
+        }
+    
+    # Send prompts to LLM
+    start_time = time.time()
+    
+    # Enhance user prompt with JSON reminder for better compliance
+    enhanced_user_prompt = f"""{user_prompt}
+
+REMINDER: Respond with ONLY valid JSON starting with {{ and ending with }}. No markdown, no explanations, just the JSON object with a "files" key containing all website files."""
+    
+    try:
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=enhanced_user_prompt)
+        ]
+        
+        logger.info(f"Invoking LLM with model {actual_model_name}...")
+        
+        if langfuse_handler:
+            response = llm.invoke(
+                messages,
+                config={
+                    "callbacks": [langfuse_handler],
+                    "metadata": {
+                        "project_type": "website_generation",
+                        "model": actual_model_name,
+                        "provider": provider,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }
+            )
+        else:
+            response = llm.invoke(messages)
+        
+        if hasattr(response, 'content'):
+            response_text = response.content
+        else:
+            response_text = str(response)
+        
+        execution_time = time.time() - start_time
+        logger.info(f"Received response ({len(response_text)} chars) in {execution_time:.2f}s")
+        
+        # Check for empty response
+        if not response_text or len(response_text.strip()) == 0:
+            logger.error("LLM returned empty response")
+            return {
+                "status": "error",
+                "error": "LLM returned empty response - no content received"
+            }
+        
+        # Log first 500 chars for debugging
+        logger.debug(f"Response preview (first 500 chars): {response_text[:500]}")
+        
+    except Exception as e:
+        logger.error(f"LLM call failed: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "error": f"LLM call failed: {e}"
+        }
+    
+    # Check for truncated response (doesn't end with })
+    response_text_stripped = response_text.strip()
+    if not response_text_stripped.endswith('}'):
+        logger.warning("Response appears to be truncated (doesn't end with })")
+        # Try to detect if it's a JSON truncation
+        if '"files"' in response_text and '{' in response_text:
+            # Try to salvage what we can by finding the last complete file entry
+            logger.warning("Attempting to salvage partial JSON...")
+            # This is a truncated response - we'll handle it in parse_json_response
+    
+    # Parse JSON response
+    try:
+        files = parse_json_response(response_text)
+        logger.info(f"Parsed {len(files)} files from response")
+    except Exception as e:
+        # Check if it's a truncation error
+        error_str = str(e).lower()
+        if 'unterminated' in error_str or 'truncated' in error_str or not response_text_stripped.endswith('}'):
+            logger.error(f"Response appears to be truncated. Error: {e}")
+            logger.error(f"Response length: {len(response_text)} chars")
+            logger.error(f"Response ends with: {repr(response_text[-100:])}")
+            return {
+                "status": "error",
+                "error": f"Response truncated - max_tokens limit may be too low. Error: {e}"
+            }
+        
+        # Log more details about the failed response
+        logger.error(f"Failed to parse JSON: {e}")
+        logger.error(f"Response length: {len(response_text)} chars")
+        logger.error(f"Response starts with: {repr(response_text[:200])}")
+        logger.error(f"Response ends with: {repr(response_text[-200:])}")
+        return {
+            "status": "error",
+            "error": f"Failed to parse JSON: {e}"
+        }
+    
+    # Ensure exactly one main.py
+    files = ensure_main_py(files)
+    
+    # Write files
+    logger.info(f"Writing {len(files)} files to {output_dir}...")
+    created_files = write_files(files, output_dir)
+    
+    # Flush LangFuse if initialized
+    if langfuse_client:
+        try:
+            time.sleep(1)
+            langfuse_client.flush()
+        except Exception as e:
+            logger.warning(f"Failed to flush LangFuse: {e}")
+    
+    return {
+        "status": "success",
+        "output_directory": str(output_dir),
+        "created_files": created_files,
+        "total_files": len(created_files),
+        "model": actual_model_name,
+        "execution_time": execution_time
+    }
+
+
 def main():
-    """Main execution flow."""
+    """Main execution flow (CLI entry point)."""
     # Create run directory with unique timestamp ID
     run_dir = setup_run_directory(base_dir="runs")
     run_id = run_dir.name
