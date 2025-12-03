@@ -10,6 +10,7 @@ langfuse
 python-dotenv>=1.0.0
 requests>=2.31.0
 httpx>=0.25.0
+flask>=2.3.0
 
 # HTML parsing
 beautifulsoup4>=4.12.0
