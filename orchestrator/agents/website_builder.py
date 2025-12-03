@@ -85,31 +85,10 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     execution_time = time.time() - start_time
     print(f"✓ Generated {len(response_text)} characters in {execution_time:.2f}s")
     
-    # Parse JSON response
+    # Parse JSON response using main.py's robust parser
     print("Parsing JSON response...")
-    # Extract JSON object (find first { and matching })
-    json_start = response_text.find('{')
-    if json_start < 0:
-        raise Exception("No JSON object found in LLM response")
-    
-    # Count braces to find matching closing brace
-    brace_count = 0
-    json_end = json_start
-    for i in range(json_start, len(response_text)):
-        if response_text[i] == '{':
-            brace_count += 1
-        elif response_text[i] == '}':
-            brace_count -= 1
-            if brace_count == 0:
-                json_end = i + 1
-                break
-    
-    if json_end <= json_start:
-        raise Exception("Could not find matching closing brace in JSON")
-    
-    json_text = response_text[json_start:json_end]
-    # Use main.py's parse_json_response function on the extracted JSON
-    files = parse_json_response(json_text)
+    # Use main.py's parse_json_response function which handles markdown code blocks, etc.
+    files = parse_json_response(response_text)
     print(f"✓ Parsed {len(files)} files")
     
     # Ensure main.py exists

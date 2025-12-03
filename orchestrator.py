@@ -52,7 +52,7 @@ class WebsiteServer:
         self.process = None
         self.url = f"http://localhost:{port}"
     
-    def start(self, timeout: int = 30) -> bool:
+    def start(self, timeout: int = 60) -> bool:
         """
         Start the Flask server.
         
@@ -71,28 +71,53 @@ class WebsiteServer:
         env = os.environ.copy()
         env['FLASK_APP'] = 'main.py'
         env['FLASK_ENV'] = 'development'
+        env['FLASK_PORT'] = str(self.port)  # Pass port to Flask app
         
         try:
+            # Use relative path since we're setting cwd
             self.process = subprocess.Popen(
-                [sys.executable, str(main_py)],
+                [sys.executable, "main.py"],
                 cwd=str(self.website_dir),
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
             
+            # Give Flask a moment to initialize (especially in debug mode which restarts)
+            time.sleep(3)
+            
             # Wait for server to start
-            for _ in range(timeout):
+            for i in range(timeout):
+                # Check if process is still running
+                if self.process.poll() is not None:
+                    # Process exited - read error
+                    stdout, stderr = self.process.communicate()
+                    error_output = (stderr or stdout or b"").decode('utf-8', errors='ignore')
+                    if error_output:
+                        print(f"Server process exited. Error output:\n{error_output[:500]}")
+                    return False
+                
                 try:
-                    response = requests.get(self.url, timeout=1)
-                    if response.status_code == 200:
+                    response = requests.get(self.url, timeout=2)
+                    # Accept 200 (OK) or 403 (Forbidden - server is running but may have access issues)
+                    # The important thing is that the server responded
+                    if response.status_code in [200, 403]:
                         print(f"✓ Website server started on {self.url}")
                         return True
                 except requests.exceptions.RequestException:
                     pass
+                
+                # Print progress every 10 seconds
+                if i > 0 and i % 10 == 0:
+                    print(f"  Waiting for server... ({i}/{timeout}s)")
+                
                 time.sleep(1)
             
             print(f"⚠ Server did not start within {timeout} seconds")
+            # Try to get error output
+            if self.process.poll() is None:
+                # Process still running but not responding - might be stuck
+                print("  Server process is running but not responding to requests")
             return False
             
         except Exception as e:
@@ -136,12 +161,12 @@ class Orchestrator:
         
         Args:
             ground_truth_path: Path to ground truth vulnerabilities JSON
-            output_dir: Directory for output files (default: orchestrator_runs/)
+            output_dir: Directory for output files (default: runs/orchestrator/)
             website_builder_model: Model to use for website builder
             red_team_model: Model to use for red team agent
         """
         self.ground_truth_path = Path(ground_truth_path)
-        self.output_dir = output_dir or (project_root / "orchestrator_runs")
+        self.output_dir = output_dir or (project_root / "runs" / "orchestrator")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.website_builder_model = website_builder_model
         self.red_team_model = red_team_model
@@ -759,13 +784,17 @@ class Orchestrator:
         server = None
         
         try:
-            # Run the graph
+            # Run the graph - stream returns states, not (node_name, state) tuples
             final_state = None
-            for node_name, node_state in self.graph.stream(initial_state):
-                final_state = node_state
-                # Track server for cleanup
-                if isinstance(node_state, dict) and "server" in node_state:
-                    server = node_state.get("server")
+            for state_update in self.graph.stream(initial_state):
+                # state_update is a dict with node names as keys
+                if isinstance(state_update, dict):
+                    # Get the last node's state
+                    for node_name, node_state in state_update.items():
+                        final_state = node_state
+                        # Track server for cleanup
+                        if isinstance(node_state, dict) and "server" in node_state:
+                            server = node_state.get("server")
             
             # Extract final state
             if not final_state:
@@ -845,7 +874,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="orchestrator_runs",
+        default="runs/orchestrator",
         help="Output directory for runs"
     )
     parser.add_argument(

@@ -93,14 +93,31 @@ def ensure_main_py(files: dict) -> dict:
             del files[f]
     
     elif len(main_py_files) == 0:
-        logger.info("No main.py found, creating placeholder main.py")
+        logger.info("No main.py found, creating Flask app template")
+        # Create a basic Flask app that serves HTML files
+        # Use port from environment variable FLASK_PORT or default to 5000
         files["main.py"] = """#!/usr/bin/env python3
 \"\"\"
-Main entry point for the project.
+Flask application to serve the website.
 \"\"\"
+from flask import Flask, send_file
+import os
 
-if __name__ == "__main__":
-    print("Project created successfully!")
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return send_file('index.html')
+
+@app.route('/<path:filename>')
+def serve_file(filename):
+    if os.path.exists(filename):
+        return send_file(filename)
+    return send_file('index.html'), 404
+
+if __name__ == '__main__':
+    port = int(os.environ.get('FLASK_PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
 """
     
     # Ensure it's exactly "main.py" (not in subdirectory)
@@ -525,7 +542,7 @@ REMINDER: Respond with ONLY valid JSON starting with {{ and ending with }}. No m
 def main():
     """Main execution flow (CLI entry point)."""
     # Create run directory with unique timestamp ID
-    run_dir = setup_run_directory(base_dir="runs")
+    run_dir = setup_run_directory(base_dir="runs/website_generator")
     run_id = run_dir.name
     logger.info("=" * 60)
     logger.info(f"Starting Website Generator Run: {run_id}")

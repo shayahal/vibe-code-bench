@@ -32,7 +32,7 @@ This will:
 ```bash
 python orchestrator.py \
     --ground-truth red_team_agent/eval/ground_truth_vulnerabilities.json \
-    --output-dir orchestrator_runs \
+    --output-dir runs/orchestrator \
     --website-model "anthropic/claude-3-haiku" \
     --red-team-model "openai/gpt-4" \
     --prompt "build a website for my restaurant" \
@@ -42,7 +42,7 @@ python orchestrator.py \
 ### Arguments
 
 - `--ground-truth`: Path to ground truth vulnerabilities JSON (default: `red_team_agent/eval/ground_truth_vulnerabilities.json`)
-- `--output-dir`: Directory for output files (default: `orchestrator_runs`)
+- `--output-dir`: Directory for output files (default: `runs/orchestrator`)
 - `--website-model`: Model for website builder (default: `anthropic/claude-3-haiku`)
 - `--red-team-model`: Model for red team agent (default: `anthropic/claude-3-haiku`)
 - `--prompt`: Custom website prompt (default: pizzeria website)
@@ -53,7 +53,7 @@ python orchestrator.py \
 Each run creates a directory:
 
 ```
-orchestrator_runs/
+runs/orchestrator/
   run_20251203_133000/
     website/                    # Generated website files
       index.html
@@ -81,11 +81,11 @@ The `final_report.json` contains:
   "build_result": {
     "status": "success",
     "files_created": 9,
-    "output_directory": "orchestrator_runs/run_20251203_133000/website"
+    "output_directory": "runs/orchestrator/run_20251203_133000/website"
   },
   "red_team_result": {
     "execution_time": 45.23,
-    "report_file": "orchestrator_runs/run_20251203_133000/red_team_reports/..."
+    "report_file": "runs/orchestrator/run_20251203_133000/red_team_reports/..."
   },
   "evaluation": {
     "url": "http://localhost:5000",
@@ -151,7 +151,7 @@ ORCHESTRATOR: Full Evaluation Pipeline
 STEP 1: Building Website
 ============================================================
 ✓ Website built successfully
-  Output directory: orchestrator_runs/run_20251203_133000/website
+  Output directory: runs/orchestrator/run_20251203_133000/website
   Files created: 9
 
 ============================================================
@@ -166,7 +166,7 @@ STEP 3: Running Red Team Agent
 ✓ Loaded 6 security testing tools
 ✓ Red team assessment completed
   Execution time: 45.23s
-  Report saved: orchestrator_runs/run_20251203_133000/red_team_reports/...
+  Report saved: runs/orchestrator/run_20251203_133000/red_team_reports/...
 
 ============================================================
 STEP 4: Putting Website to Sleep
@@ -179,7 +179,7 @@ STEP 5: Evaluating Findings
 ✓ Evaluation completed
   Overall detection rate: 45.00%
   Found: 9/20
-  Results saved: orchestrator_runs/run_20251203_133000/evaluation_results.json
+  Results saved: runs/orchestrator/run_20251203_133000/evaluation_results.json
 
 ======================================================================
 EVALUATION COMPLETE
@@ -190,7 +190,7 @@ URL: fhttp://localhost:5000
 Vulnerabilities Found: 9/20
 Detection Rate: 45.00%
 
-Final Report: orchestrator_runs/run_20251203_133000/final_report.json
+Final Report: runs/orchestrator/run_20251203_133000/final_report.json
 
 ✓ Orchestration completed successfully!
 ```
@@ -205,7 +205,7 @@ from pathlib import Path
 
 orchestrator = Orchestrator(
     ground_truth_path="red_team_agent/eval/ground_truth_vulnerabilities.json",
-    output_dir=Path("orchestrator_runs"),
+    output_dir=Path("runs/orchestrator"),
     website_builder_model="anthropic/claude-3-haiku",
     red_team_model="openai/gpt-4"
 )

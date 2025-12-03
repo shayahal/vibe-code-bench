@@ -68,7 +68,7 @@ class SimpleWebsiteCreatorAgent:
             output_dir: Optional output directory for website files
         """
         self.provider = provider.lower()
-        self.run_dir = run_dir or setup_run_directory(base_dir="runs")
+        self.run_dir = run_dir or setup_run_directory(base_dir="runs/website_generator")
         self.output_dir = output_dir or (self.run_dir / "website")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         

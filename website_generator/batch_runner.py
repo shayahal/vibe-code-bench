@@ -140,7 +140,7 @@ def log_failure(failures_log: Path, model_name: str, prompt: str, attempt: int, 
 def run_batch(
     models: List[str],
     prompts: List[str],
-    base_output_dir: str = "runs",
+    base_output_dir: str = "runs/website_generator",
     skip_langfuse: bool = False
 ) -> Dict[str, Any]:
     """
