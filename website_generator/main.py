@@ -369,19 +369,32 @@ def generate_website(
         }
     
     # Initialize LLM with higher limits for website generation
-    # Use very high token limit to avoid truncation (Claude models can handle up to 4096 tokens output)
-    # For large websites, we need more - use 16000 to be safe
+    # Note: Many models have context limits (e.g., 16385 tokens total)
+    # We need to leave room for input tokens, so use a conservative output limit
+    # For gpt-3.5-turbo and similar models, use 12000 to leave room for input
+    # For Claude models, they typically support higher output limits
     try:
+        # Determine appropriate max_tokens based on model
+        model_lower = (model_name or "").lower()
+        if "claude" in model_lower or "anthropic" in model_lower:
+            # Claude models can handle higher output limits
+            max_output_tokens = 14000
+        else:
+            # For GPT models and others, be more conservative
+            # Leave room for input (typically 1000-2000 tokens for prompts)
+            # Most models have ~16k context, so use 14000 to be safe
+            max_output_tokens = 14000
+        
         llm, actual_model_name = initialize_llm(
             provider=provider,
             model_name=model_name,
             temperature=0.7,
             api_key=api_key,
-            max_tokens=16000,  # Very high limit to avoid truncation for full websites
+            max_tokens=max_output_tokens,  # Conservative limit to fit within context window
             timeout=300  # 5 minutes for large responses
         )
         logger.info(f"LLM initialized: {actual_model_name}")
-        logger.info(f"  max_tokens: 16000")
+        logger.info(f"  max_tokens: {max_output_tokens}")
         logger.info(f"  timeout: 300s")
     except Exception as e:
         logger.error(f"Failed to initialize LLM: {e}", exc_info=True)
