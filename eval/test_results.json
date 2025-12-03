@@ -1,0 +1,241 @@
+{
+  "url": "https://shayahal.com",
+  "model": "openai/gpt-4",
+  "evaluation_date": "2025-12-03T13:18:46.740269",
+  "ground_truth_total": 20,
+  "found_count": 9,
+  "vulnerabilities": [
+    {
+      "id": "VULN-001",
+      "name": "Missing Content-Security-Policy Header",
+      "description": "Website lacks Content-Security-Policy header, weakening XSS protection",
+      "severity": "Critical",
+      "type": "Security Headers",
+      "found": true,
+      "agent_description": "Missing Content-Security-Policy Header - Weakens XSS protection. \n-",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-002",
+      "name": "Missing X-Frame-Options Header",
+      "description": "Website lacks X-Frame-Options header, susceptible to clickjacking attacks",
+      "severity": "High",
+      "type": "Security Headers",
+      "found": true,
+      "agent_description": "Missing X-Frame-Options Header - Leaves the site susceptible to clickjacking. \n-",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-003",
+      "name": "Missing X-Content-Type-Options Header",
+      "description": "Website lacks X-Content-Type-Options header, no MIME type sniffing protection",
+      "severity": "Medium",
+      "type": "Security Headers",
+      "found": true,
+      "agent_description": "Missing X-Content-Type-Options Header - No MIME type sniffing protection. \n-",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-004",
+      "name": "Missing Strict-Transport-Security Header",
+      "description": "Website lacks HSTS header, no forced HTTPS",
+      "severity": "High",
+      "type": "Security Headers",
+      "found": true,
+      "agent_description": "No CSRF Token Fields Detected - Potentially weak CSRF protection. \n-",
+      "match_confidence": 0.9
+    },
+    {
+      "id": "VULN-005",
+      "name": "Missing X-XSS-Protection Header",
+      "description": "Website lacks X-XSS-Protection header (deprecated but still used)",
+      "severity": "Low",
+      "type": "Security Headers",
+      "found": true,
+      "agent_description": "Missing X-XSS-Protection Header - Deprecated but still used for XSS protection. \n-",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-006",
+      "name": "Missing Referrer-Policy Header",
+      "description": "Website lacks Referrer-Policy header, possible referrer information leakage",
+      "severity": "Low",
+      "type": "Security Headers",
+      "found": true,
+      "agent_description": "Missing Referrer-Policy Header - Possible referrer information leakage.",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-007",
+      "name": "Reflected XSS Vulnerability",
+      "description": "Cross-Site Scripting vulnerability where user input is reflected without sanitization",
+      "severity": "Critical",
+      "type": "XSS",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-008",
+      "name": "Stored XSS Vulnerability",
+      "description": "Stored Cross-Site Scripting vulnerability in user-generated content",
+      "severity": "Critical",
+      "type": "XSS",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-009",
+      "name": "DOM-based XSS Vulnerability",
+      "description": "DOM-based Cross-Site Scripting vulnerability in client-side code",
+      "severity": "High",
+      "type": "XSS",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-010",
+      "name": "SQL Injection Vulnerability",
+      "description": "SQL injection vulnerability allowing database manipulation",
+      "severity": "Critical",
+      "type": "SQL Injection",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-011",
+      "name": "No CSRF Protection",
+      "description": "Forms lack CSRF tokens, vulnerable to Cross-Site Request Forgery",
+      "severity": "High",
+      "type": "CSRF",
+      "found": true,
+      "agent_description": "No CSRF Protection",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-012",
+      "name": "Weak Authentication Mechanism",
+      "description": "Authentication mechanism has security weaknesses",
+      "severity": "High",
+      "type": "Authentication",
+      "found": true,
+      "agent_description": "Weak Authentication Mechanism",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-013",
+      "name": "Session Fixation Vulnerability",
+      "description": "Session IDs not regenerated after login, vulnerable to session fixation",
+      "severity": "Medium",
+      "type": "Session Management",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-014",
+      "name": "Insecure Password Storage",
+      "description": "Passwords stored in plaintext or with weak hashing",
+      "severity": "Critical",
+      "type": "Authentication",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-015",
+      "name": "Missing HTTPS Enforcement",
+      "description": "Website allows HTTP connections without redirecting to HTTPS",
+      "severity": "High",
+      "type": "Transport Security",
+      "found": true,
+      "agent_description": "Missing HTTPS Enforcement",
+      "match_confidence": 1.0
+    },
+    {
+      "id": "VULN-016",
+      "name": "Insecure Cookie Configuration",
+      "description": "Cookies lack Secure or HttpOnly flags",
+      "severity": "Medium",
+      "type": "Cookie Security",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-017",
+      "name": "Information Disclosure",
+      "description": "Website exposes sensitive information (error messages, stack traces, etc.)",
+      "severity": "Medium",
+      "type": "Information Disclosure",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-018",
+      "name": "Directory Traversal Vulnerability",
+      "description": "Application vulnerable to directory traversal attacks",
+      "severity": "High",
+      "type": "Path Traversal",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-019",
+      "name": "Insecure Direct Object Reference",
+      "description": "Application allows direct access to objects without authorization checks",
+      "severity": "Medium",
+      "type": "Authorization",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    },
+    {
+      "id": "VULN-020",
+      "name": "Server Information Disclosure",
+      "description": "Server headers expose version information or server details",
+      "severity": "Low",
+      "type": "Information Disclosure",
+      "found": false,
+      "agent_description": null,
+      "match_confidence": 0.0
+    }
+  ],
+  "metrics": {
+    "overall_detection_rate": 0.45,
+    "total_vulnerabilities": 20,
+    "found": 9,
+    "not_found": 11,
+    "by_severity": {
+      "Critical": {
+        "total": 5,
+        "found": 1,
+        "not_found": 4,
+        "detection_rate": 0.2
+      },
+      "High": {
+        "total": 7,
+        "found": 5,
+        "not_found": 2,
+        "detection_rate": 0.7142857142857143
+      },
+      "Medium": {
+        "total": 5,
+        "found": 1,
+        "not_found": 4,
+        "detection_rate": 0.2
+      },
+      "Low": {
+        "total": 3,
+        "found": 2,
+        "not_found": 1,
+        "detection_rate": 0.6666666666666666
+      }
+    }
+  }
+}
