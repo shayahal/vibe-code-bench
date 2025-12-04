@@ -16,19 +16,19 @@ logger = get_logger(__name__)
 
 
 class WebsiteBuilderEvaluator:
-    """Evaluates website builder agents by analyzing generated websites."""
-    
+    """Evaluates website builder agents by analyzing generated website quality."""
+
     def __init__(self, ground_truth_path: str):
         """
         Initialize website builder evaluator.
-        
+
         Args:
-            ground_truth_path: Path to ground truth vulnerabilities JSON file
+            ground_truth_path: Path to ground truth quality criteria JSON file
         """
         self.ground_truth_path = get_absolute_path(ground_truth_path)
         if not self.ground_truth_path.exists():
             raise FileNotFoundError(f"Ground truth file not found: {self.ground_truth_path}")
-    
+
     def evaluate(
         self,
         builder_module_path: str,
@@ -36,68 +36,65 @@ class WebsiteBuilderEvaluator:
         builder_name: str = "unknown"
     ) -> Dict[str, Any]:
         """
-        Evaluate a website builder by analyzing its generated website.
-        
+        Evaluate a website builder by analyzing its generated website quality.
+
         Args:
             builder_module_path: Path to builder module (e.g., 'website_generator.main')
             website_dir: Directory containing generated website files
             builder_name: Name/version of the builder
-            
+
         Returns:
             Evaluation results dictionary
         """
-        from vibe_code_bench.website_generator.eval.inspect_eval_framework import (
-            evaluate_website_builder
+        from vibe_code_bench.website_generator.eval.quality_eval_framework import (
+            evaluate_website_builder_quality
         )
-        
+
         website_dir = Path(website_dir)
         if not website_dir.exists():
             raise FileNotFoundError(f"Website directory not found: {website_dir}")
-        
-        logger.info(f"Evaluating website builder: {builder_name}")
-        logger.info(f"  Builder module: {builder_module_path}")
+
+        logger.info(f"Evaluating website builder quality: {builder_name}")
         logger.info(f"  Website directory: {website_dir}")
         logger.info(f"  Ground truth: {self.ground_truth_path}")
-        
-        results = evaluate_website_builder(
-            builder_module_path=builder_module_path,
+
+        results = evaluate_website_builder_quality(
             website_dir=website_dir,
             ground_truth_path=str(self.ground_truth_path),
             builder_name=builder_name
         )
-        
+
         logger.info(f"Website builder evaluation completed")
-        logger.info(f"  Security score: {results['metrics']['overall_security_score']:.2%}")
-        logger.info(f"  Vulnerabilities found: {results['metrics']['vulnerabilities_found']}/{results['metrics']['vulnerabilities_total']}")
-        
+        logger.info(f"  Quality score: {results['metrics']['overall_quality_score']:.2%}")
+        logger.info(f"  Criteria met: {results['criteria_summary']['met_criteria']}/{results['criteria_summary']['total_criteria']}")
+
         return results
-    
+
     def save_results(self, results: Dict[str, Any], output_path: str) -> Path:
         """
         Save evaluation results to JSON file.
-        
+
         Args:
             results: Evaluation results dictionary
             output_path: Path to save JSON file
-            
+
         Returns:
             Path to saved file
         """
-        from vibe_code_bench.website_generator.eval.inspect_eval_framework import (
-            WebsiteBuilderEvaluator as WBEvaluator
+        from vibe_code_bench.website_generator.eval.quality_eval_framework import (
+            WebsiteBuilderQualityEvaluator
         )
-        
+
         output_file = get_absolute_path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Use the evaluator's save method
-        evaluator = WBEvaluator(
-            builder_module_path="",  # Not needed for saving
+        evaluator = WebsiteBuilderQualityEvaluator(
             website_dir=Path(""),  # Not needed for saving
             ground_truth_path=str(self.ground_truth_path)
         )
         evaluator.save_results(results, str(output_file))
-        
+
         logger.info(f"Website builder evaluation results saved to: {output_file}")
         return output_file
 

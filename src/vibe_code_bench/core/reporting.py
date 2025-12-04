@@ -58,98 +58,113 @@ class ReportGenerator:
 
 
 class WebsiteBuilderReportGenerator(ReportGenerator):
-    """Generates reports for website builder evaluations."""
-    
+    """Generates reports for website builder quality evaluations."""
+
     @staticmethod
     def generate_report(eval_results: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate structured report from evaluation results.
-        
+
         Args:
             eval_results: Website builder evaluation results
-            
+
         Returns:
             Structured report dictionary
         """
+        metadata = eval_results.get('metadata', {})
         return {
             'metadata': {
-                'report_type': 'website_builder_evaluation',
-                'builder_name': eval_results.get('builder_name', 'unknown'),
-                'evaluation_date': eval_results.get('evaluation_date', datetime.now().isoformat()),
+                'report_type': metadata.get('report_type', 'website_builder_quality_evaluation'),
+                'builder_name': metadata.get('builder_name', 'unknown'),
+                'evaluation_date': metadata.get('evaluation_date', datetime.now().isoformat()),
                 'timestamp': datetime.now().isoformat()
             },
-            'builder_analysis': eval_results.get('builder_analysis', {}),
-            'security_analysis': eval_results.get('security_analysis', {}),
+            'quality_analysis': eval_results.get('quality_analysis', {}),
             'metrics': eval_results.get('metrics', {}),
-            'vulnerabilities': eval_results.get('vulnerabilities', [])
+            'criteria_summary': eval_results.get('criteria_summary', {})
         }
-    
+
     @staticmethod
     def generate_markdown(eval_results: Dict[str, Any]) -> str:
         """
         Generate Markdown report from evaluation results.
-        
+
         Args:
             eval_results: Website builder evaluation results
-            
+
         Returns:
             Markdown formatted report
         """
         md = []
-        
+
         # Header
-        md.append("# Website Builder Evaluation Report")
+        md.append("# Website Builder Quality Evaluation Report")
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Metadata
+        metadata = eval_results.get('metadata', {})
         md.append("## Metadata")
         md.append("")
-        md.append(f"- **Builder Name:** {eval_results.get('builder_name', 'unknown')}")
-        md.append(f"- **Evaluation Date:** {eval_results.get('evaluation_date', 'unknown')}")
+        md.append(f"- **Builder Name:** {metadata.get('builder_name', 'unknown')}")
+        md.append(f"- **Evaluation Date:** {metadata.get('evaluation_date', 'unknown')}")
         md.append("")
-        
+
         # Metrics
         metrics = eval_results.get('metrics', {})
+        criteria_summary = eval_results.get('criteria_summary', {})
         md.append("## Evaluation Metrics")
         md.append("")
-        md.append(f"- **Overall Security Score:** {metrics.get('overall_security_score', 0):.2%}")
-        md.append(f"- **Vulnerabilities Found:** {metrics.get('vulnerabilities_found', 0)}/{metrics.get('vulnerabilities_total', 0)}")
+        md.append(f"- **Overall Quality Score:** {metrics.get('overall_quality_score', 0):.2%}")
+        md.append(f"- **Criteria Met:** {criteria_summary.get('met_criteria', 0)}/{criteria_summary.get('total_criteria', 0)}")
+        md.append(f"- **Required Criteria Met:** {criteria_summary.get('required_met', 0)}/{criteria_summary.get('required_total', 0)}")
+        md.append(f"- **Optional Criteria Met:** {criteria_summary.get('optional_met', 0)}/{criteria_summary.get('optional_total', 0)}")
         md.append("")
-        
-        # By Severity
-        md.append("### By Severity")
+
+        # Category Scores
+        md.append("### Quality by Category")
         md.append("")
-        by_severity = metrics.get('by_severity', {})
-        for severity in ['Critical', 'High', 'Medium', 'Low']:
-            if severity in by_severity:
-                sev_metrics = by_severity[severity]
-                md.append(f"**{severity}:**")
-                md.append(f"- Found: {sev_metrics.get('found', 0)}/{sev_metrics.get('total', 0)}")
-                md.append("")
-        
-        # Vulnerabilities
-        vulnerabilities = eval_results.get('vulnerabilities', [])
-        found_vulns = [v for v in vulnerabilities if v.get('found', False)]
-        not_found_vulns = [v for v in vulnerabilities if not v.get('found', False)]
-        
-        md.append("## Found Vulnerabilities")
+        category_scores = metrics.get('category_scores', {})
+        for category, score in category_scores.items():
+            md.append(f"- **{category.replace('_', ' ').title()}:** {score:.2%}")
         md.append("")
-        if found_vulns:
-            md.append(f"**Total: {len(found_vulns)}**")
+
+        # Detailed Category Results
+        quality_analysis = eval_results.get('quality_analysis', {})
+        category_results = quality_analysis.get('category_results', {})
+
+        for category_name, category_data in category_results.items():
+            md.append(f"## {category_name.replace('_', ' ').title()}")
             md.append("")
-            for vuln in found_vulns[:20]:  # Limit to first 20
-                md.append(f"- **{vuln.get('id', 'Unknown')}:** {vuln.get('name', 'Unknown')} ({vuln.get('severity', 'Unknown')})")
-            if len(found_vulns) > 20:
-                md.append(f"\n... and {len(found_vulns) - 20} more")
-        else:
-            md.append("✓ No vulnerabilities found!")
+            md.append(f"**Score:** {category_data.get('score', 0):.2%} ({category_data.get('met_criteria', 0)}/{category_data.get('total_criteria', 0)} criteria met)")
+            md.append("")
+
+            # Met criteria
+            met_criteria = [c for c in category_data.get('criteria', []) if c.get('met', False)]
+            if met_criteria:
+                md.append("### ✓ Met:")
+                md.append("")
+                for criterion in met_criteria:
+                    required_tag = " *(required)*" if criterion.get('required', False) else ""
+                    md.append(f"- **{criterion.get('id')}:** {criterion.get('name')}{required_tag}")
+                    md.append(f"  - {criterion.get('description')}")
+                md.append("")
+
+            # Unmet criteria
+            unmet_criteria = [c for c in category_data.get('criteria', []) if not c.get('met', False)]
+            if unmet_criteria:
+                md.append("### ✗ Not Met:")
+                md.append("")
+                for criterion in unmet_criteria:
+                    required_tag = " *(required)*" if criterion.get('required', False) else ""
+                    md.append(f"- **{criterion.get('id')}:** {criterion.get('name')}{required_tag}")
+                    md.append(f"  - {criterion.get('description')}")
+                md.append("")
+
+        md.append("---")
         md.append("")
-        
-        md.append("## Secure (Not Found)")
-        md.append("")
-        md.append(f"✓ {len(not_found_vulns)}/{len(vulnerabilities)} vulnerabilities not present (good!)")
+        md.append(f"*Report generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
         md.append("")
         
         # Footer
@@ -365,9 +380,254 @@ class RedTeamReportGenerator(ReportGenerator):
         return json_path, md_path
 
 
+class ConsolidatedReportGenerator(ReportGenerator):
+    """Generates consolidated reports for new run structure."""
+
+    @staticmethod
+    def generate_run_json(
+        run_id: str,
+        prompt: str,
+        url: str,
+        website_builder_model: str,
+        red_team_model: str,
+        build_result: Optional[Dict[str, Any]],
+        red_team_result: Optional[Dict[str, Any]],
+        website_builder_eval: Optional[Dict[str, Any]],
+        red_team_eval: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Generate consolidated run.json with all data.
+
+        Args:
+            run_id: Run identifier
+            prompt: Website prompt used
+            url: Target URL
+            website_builder_model: Model used for website builder
+            red_team_model: Model used for red team agent
+            build_result: Website build results
+            red_team_result: Red team agent results
+            website_builder_eval: Website builder evaluation results
+            red_team_eval: Red team evaluation results
+
+        Returns:
+            Complete run data dictionary
+        """
+        return {
+            'metadata': {
+                'run_id': run_id,
+                'timestamp': datetime.now().isoformat(),
+                'prompt': prompt,
+                'url': url,
+                'models': {
+                    'website_builder': website_builder_model,
+                    'red_team_agent': red_team_model
+                }
+            },
+            'execution': {
+                'website_build': {
+                    'status': build_result.get('result', {}).get('status', 'unknown') if build_result else 'not_run',
+                    'files_created': build_result.get('result', {}).get('total_files', 0) if build_result else 0,
+                    'output_directory': str(build_result.get('website_dir', '')) if build_result else '',
+                    'files': build_result.get('result', {}).get('created_files', []) if build_result else []
+                } if build_result else None,
+                'red_team_assessment': {
+                    'execution_time_seconds': round(red_team_result.get('execution_time', 0), 2) if red_team_result else 0,
+                    'report_file': str(red_team_result.get('report_file', '')) if red_team_result else '',
+                    'trace_id': red_team_result.get('trace_id') if red_team_result else None
+                } if red_team_result else None
+            },
+            'evaluation': {
+                'website_builder': {
+                    'metrics': website_builder_eval.get('metrics', {}) if website_builder_eval else {},
+                    'vulnerabilities': website_builder_eval.get('vulnerabilities', []) if website_builder_eval else [],
+                    'builder_analysis': website_builder_eval.get('builder_analysis', {}) if website_builder_eval else {},
+                    'security_analysis': website_builder_eval.get('security_analysis', {}) if website_builder_eval else {}
+                } if website_builder_eval else None,
+                'red_team': {
+                    'metrics': red_team_eval.get('metrics', {}) if red_team_eval else {},
+                    'vulnerabilities': red_team_eval.get('vulnerabilities', []) if red_team_eval else []
+                } if red_team_eval else None
+            }
+        }
+
+    @staticmethod
+    def generate_consolidated_markdown(
+        run_id: str,
+        prompt: str,
+        url: str,
+        website_builder_model: str,
+        red_team_model: str,
+        build_result: Optional[Dict[str, Any]],
+        red_team_result: Optional[Dict[str, Any]],
+        website_builder_eval: Optional[Dict[str, Any]],
+        red_team_eval: Optional[Dict[str, Any]]
+    ) -> str:
+        """
+        Generate consolidated Markdown report.
+
+        Args:
+            run_id: Run identifier
+            prompt: Website prompt used
+            url: Target URL
+            website_builder_model: Model used for website builder
+            red_team_model: Model used for red team agent
+            build_result: Website build results
+            red_team_result: Red team agent results
+            website_builder_eval: Website builder evaluation results
+            red_team_eval: Red team evaluation results
+
+        Returns:
+            Markdown formatted consolidated report
+        """
+        md = []
+
+        # Header
+        md.append("# Orchestrator Run Report")
+        md.append("")
+        md.append("---")
+        md.append("")
+
+        # Metadata
+        md.append("## Run Metadata")
+        md.append("")
+        md.append(f"- **Run ID:** `{run_id}`")
+        md.append(f"- **Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        md.append(f"- **Prompt:** {prompt[:100]}..." if len(prompt) > 100 else f"- **Prompt:** {prompt}")
+        md.append(f"- **Target URL:** {url}")
+        md.append(f"- **Website Builder Model:** {website_builder_model}")
+        md.append(f"- **Red Team Model:** {red_team_model}")
+        md.append("")
+
+        # Execution Summary
+        md.append("## Execution Summary")
+        md.append("")
+
+        if build_result:
+            md.append("### Website Build")
+            md.append(f"- **Status:** {build_result.get('result', {}).get('status', 'unknown')}")
+            md.append(f"- **Files Created:** {build_result.get('result', {}).get('total_files', 0)}")
+            md.append(f"- **Output Directory:** `{build_result.get('website_dir', '')}`")
+            md.append("")
+
+        if red_team_result:
+            md.append("### Red Team Assessment")
+            md.append(f"- **Execution Time:** {red_team_result.get('execution_time', 0):.2f} seconds")
+            md.append(f"- **Report File:** `{red_team_result.get('report_file', '')}`")
+            if red_team_result.get('trace_id'):
+                md.append(f"- **Trace ID:** `{red_team_result.get('trace_id')}`")
+            md.append("")
+
+        # Evaluation Results
+        md.append("## Evaluation Results")
+        md.append("")
+
+        if website_builder_eval:
+            md.append("### Website Builder Evaluation")
+            md.append("")
+            metrics = website_builder_eval.get('metrics', {})
+            md.append(f"- **Overall Security Score:** {metrics.get('overall_security_score', 0):.2%}")
+            md.append(f"- **Vulnerabilities Found:** {metrics.get('vulnerabilities_found', 0)}/{metrics.get('vulnerabilities_total', 0)}")
+            md.append("")
+
+            # By severity
+            md.append("#### By Severity")
+            md.append("")
+            by_severity = metrics.get('by_severity', {})
+            for severity in ['Critical', 'High', 'Medium', 'Low']:
+                if severity in by_severity:
+                    sev = by_severity[severity]
+                    md.append(f"**{severity}:** {sev.get('found', 0)}/{sev.get('total', 0)} found")
+            md.append("")
+
+            # Vulnerabilities found
+            vulnerabilities = website_builder_eval.get('vulnerabilities', [])
+            found_vulns = [v for v in vulnerabilities if v.get('found', False)]
+            if found_vulns:
+                md.append("#### Vulnerabilities Found")
+                md.append("")
+                for vuln in found_vulns[:10]:
+                    md.append(f"- **{vuln.get('id')}:** {vuln.get('name')} ({vuln.get('severity')})")
+                if len(found_vulns) > 10:
+                    md.append(f"\n... and {len(found_vulns) - 10} more")
+                md.append("")
+
+        if red_team_eval:
+            md.append("### Red Team Agent Evaluation")
+            md.append("")
+            metrics = red_team_eval.get('metrics', {})
+            md.append(f"- **Overall Detection Rate:** {metrics.get('overall_detection_rate', 0):.2%}")
+            md.append(f"- **Found:** {metrics.get('found', 0)}/{metrics.get('total_vulnerabilities', 0)}")
+            md.append(f"- **Not Found:** {metrics.get('not_found', 0)}")
+            md.append("")
+
+            # By severity
+            md.append("#### Detection by Severity")
+            md.append("")
+            by_severity = metrics.get('by_severity', {})
+            for severity in ['Critical', 'High', 'Medium', 'Low']:
+                if severity in by_severity:
+                    sev = by_severity[severity]
+                    md.append(f"**{severity}:** {sev.get('found', 0)}/{sev.get('total', 0)} detected ({sev.get('detection_rate', 0):.2%})")
+            md.append("")
+
+            # Found vulnerabilities
+            vulnerabilities = red_team_eval.get('vulnerabilities', [])
+            found_vulns = [v for v in vulnerabilities if v.get('found', False)]
+            if found_vulns:
+                md.append("#### Vulnerabilities Detected")
+                md.append("")
+                for vuln in found_vulns[:10]:
+                    md.append(f"- **{vuln.get('id')}:** {vuln.get('name')} ({vuln.get('severity')})")
+                    if vuln.get('match_confidence'):
+                        md.append(f"  - Confidence: {vuln.get('match_confidence'):.2%}")
+                if len(found_vulns) > 10:
+                    md.append(f"\n... and {len(found_vulns) - 10} more")
+                md.append("")
+
+        # Footer
+        md.append("---")
+        md.append("")
+        md.append(f"*Report generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+
+        return "\n".join(md)
+
+    @staticmethod
+    def save_consolidated_reports(
+        run_dir: Path,
+        run_data: Dict[str, Any],
+        markdown_content: str
+    ) -> tuple[Path, Path]:
+        """
+        Save consolidated reports to run directory.
+
+        Args:
+            run_dir: Run directory path
+            run_data: Complete run data dictionary
+            markdown_content: Consolidated markdown content
+
+        Returns:
+            Tuple of (run_json_path, report_md_path)
+        """
+        run_dir = Path(run_dir)
+
+        # Save run.json
+        json_path = run_dir / "run.json"
+        ConsolidatedReportGenerator.save_json_report(run_data, json_path)
+
+        # Save report.md
+        md_path = run_dir / "report.md"
+        ConsolidatedReportGenerator.save_markdown_report(markdown_content, md_path)
+
+        logger.info(f"Consolidated reports saved:")
+        logger.info(f"  run.json: {json_path}")
+        logger.info(f"  report.md: {md_path}")
+
+        return json_path, md_path
+
+
 class FinalReportGenerator(ReportGenerator):
     """Generates final comprehensive reports combining all results."""
-    
+
     @staticmethod
     def generate_report(
         run_id: str,

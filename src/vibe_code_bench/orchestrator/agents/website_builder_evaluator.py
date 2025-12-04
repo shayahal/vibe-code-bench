@@ -75,8 +75,8 @@ def website_builder_evaluator_node(state: OrchestratorState) -> OrchestratorStat
         website_builder_eval_report_md = md_path
         
         logger.info("Website builder evaluation completed")
-        logger.info(f"  Security score: {website_builder_eval_results['metrics']['overall_security_score']:.2%}")
-        logger.info(f"  Vulnerabilities found: {website_builder_eval_results['metrics']['vulnerabilities_found']}/{website_builder_eval_results['metrics']['vulnerabilities_total']}")
+        logger.info(f"  Quality score: {website_builder_eval_results['metrics']['overall_quality_score']:.2%}")
+        logger.info(f"  Criteria met: {website_builder_eval_results['criteria_summary']['met_criteria']}/{website_builder_eval_results['criteria_summary']['total_criteria']}")
     except Exception as e:
         logger.error(f"Website builder evaluation failed: {e}", exc_info=True)
         # Continue without evaluation results

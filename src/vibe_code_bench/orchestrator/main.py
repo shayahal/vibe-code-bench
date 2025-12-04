@@ -135,13 +135,30 @@ class Orchestrator:
         # Initialize state
         from vibe_code_bench.website_generator.prompts import USER_PROMPT
         from langchain_core.messages import HumanMessage
-        
+        from vibe_code_bench.core.paths import create_run_structure
+
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Create new run directory structure
+        run_paths = create_run_structure(
+            run_id=run_id,
+            website_builder_model=self.website_builder_model,
+            red_team_model=self.red_team_model
+        )
+
         initial_state = {
             "messages": [HumanMessage(content="Start evaluation workflow")],
-            "run_id": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            "run_id": run_id,
             "prompt": prompt or USER_PROMPT,
             "port": port,
-            "website_dir": None,
+            # New structure paths
+            "run_dir": run_paths['run_dir'],
+            "website_dir": run_paths['website_dir'],
+            "logs_dir": run_paths['logs_dir'],
+            "run_json": run_paths['run_json'],
+            "report_md": run_paths['report_md'],
+            "red_team_report_file": run_paths['red_team_report_md'],
+            # Results
             "build_result": None,
             "url": None,
             "server": None,
@@ -149,6 +166,7 @@ class Orchestrator:
             "website_builder_eval_results": None,
             "red_team_eval_results": None,
             "final_eval_results": None,
+            # Legacy paths (for backward compatibility)
             "website_builder_eval_report_json": None,
             "website_builder_eval_report_md": None,
             "red_team_eval_report_json": None,
@@ -157,7 +175,9 @@ class Orchestrator:
             "final_report_json": None,
             "final_report_md": None,
             "eval_results": None,  # Legacy field
+            # Routing
             "next": "website_builder",
+            # Configuration
             "output_dir": self.output_dir,
             "website_builder_model": self.website_builder_model,
             "red_team_model": self.red_team_model,
@@ -211,8 +231,8 @@ class Orchestrator:
             
             if website_builder_eval:
                 print(f"\nWebsite Builder Evaluation:")
-                print(f"  Security Score: {website_builder_eval['metrics']['overall_security_score']:.2%}")
-                print(f"  Vulnerabilities Found: {website_builder_eval['metrics']['vulnerabilities_found']}/{website_builder_eval['metrics']['vulnerabilities_total']}")
+                print(f"  Quality Score: {website_builder_eval['metrics']['overall_quality_score']:.2%}")
+                print(f"  Criteria Met: {website_builder_eval['criteria_summary']['met_criteria']}/{website_builder_eval['criteria_summary']['total_criteria']}")
             
             if red_team_eval:
                 print(f"\nRed Team Evaluation:")
