@@ -23,6 +23,7 @@ from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 from langfuse import Langfuse
 
 from vibe_code_bench.core.logging_setup import get_logger
+from vibe_code_bench.red_team_agent.agent_callbacks import AgentFlowCallbackHandler
 
 logger = get_logger(__name__)
 
@@ -175,11 +176,16 @@ def create_and_run_agent(
     user_message = f"Perform a comprehensive security assessment on: {url}"
     start_time = time.time()
     
+    # Create flow logging callback
+    flow_handler = AgentFlowCallbackHandler()
+    
+    logger.info("Starting agent execution...")
+    
     try:
         result = agent.invoke(
             {"messages": [("human", user_message)]},
             config={
-                "callbacks": [langfuse_handler],
+                "callbacks": [langfuse_handler, flow_handler],
                 "metadata": {
                     "run_id": run_id,
                     "url": url,
@@ -192,6 +198,9 @@ def create_and_run_agent(
         )
         
         execution_time = time.time() - start_time
+        
+        # Log completion with tool count
+        logger.info(f"Agent execution completed ({flow_handler.tool_call_count} tool calls made)")
         
         # Extract output
         if isinstance(result, dict) and "messages" in result:

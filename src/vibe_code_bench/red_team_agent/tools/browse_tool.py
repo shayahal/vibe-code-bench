@@ -13,6 +13,9 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from langchain_core.tools import StructuredTool
+from vibe_code_bench.core.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 def browse_url(url: str) -> str:
@@ -58,15 +61,32 @@ def browse_url(url: str) -> str:
             info_parts.append(f"\nFound {len(forms)} form(s):")
             for i, form in enumerate(forms, 1):
                 form_info = []
-                form_action = form.get('action', '')
-                form_method = form.get('method', 'GET').upper()
+                form_action = form.get('action', '') or ''
+                form_method = (form.get('method', 'GET') or 'GET')
+                if isinstance(form_method, str):
+                    form_method = form_method.upper()
+                else:
+                    form_method = str(form_method).upper()
                 form_info.append(f"  Form {i}: method={form_method}, action={form_action}")
                 
                 # Find input fields
                 inputs = form.find_all(['input', 'textarea', 'select'])
                 if inputs:
-                    input_types = [inp.get('type', 'text') for inp in inputs if inp.name == 'input']
-                    input_names = [inp.get('name', 'unnamed') for inp in inputs if inp.get('name')]
+                    input_types = []
+                    input_names = []
+                    for inp in inputs:
+                        if inp.name == 'input':
+                            inp_type = inp.get('type', 'text')
+                            if isinstance(inp_type, str):
+                                input_types.append(inp_type)
+                            else:
+                                input_types.append(str(inp_type) if inp_type else 'text')
+                        inp_name = inp.get('name')
+                        if inp_name:
+                            if isinstance(inp_name, str):
+                                input_names.append(inp_name)
+                            else:
+                                input_names.append(str(inp_name))
                     if input_names:
                         form_info.append(f"    Inputs: {', '.join(input_names[:5])}")
                         if len(input_names) > 5:
@@ -83,19 +103,21 @@ def browse_url(url: str) -> str:
             external_links = set()
             
             for link in links:
-                href = link.get('href')
-                if href:
-                    absolute_url = urljoin(url, href)
-                    parsed = urlparse(absolute_url)
-                    
-                    if parsed.netloc == urlparse(url).netloc or not parsed.netloc:
-                        # Internal link
-                        if href.startswith('/') or not parsed.netloc:
-                            internal_links.add(href if href.startswith('/') else absolute_url)
-                            unique_links.add(href if href.startswith('/') else absolute_url)
-                    else:
-                        # External link
-                        external_links.add(absolute_url)
+                href_raw = link.get('href')
+                if href_raw:
+                    href = str(href_raw).strip()
+                    if href:
+                        absolute_url = urljoin(url, href)
+                        parsed = urlparse(absolute_url)
+                        
+                        if parsed.netloc == urlparse(url).netloc or not parsed.netloc:
+                            # Internal link
+                            if href.startswith('/') or not parsed.netloc:
+                                internal_links.add(href if href.startswith('/') else absolute_url)
+                                unique_links.add(href if href.startswith('/') else absolute_url)
+                        else:
+                            # External link
+                            external_links.add(absolute_url)
             
             if unique_links:
                 info_parts.append(f"\nFound {len(links)} total links:")
@@ -127,14 +149,20 @@ def browse_url(url: str) -> str:
         if security_meta:
             info_parts.append(f"\nSecurity Meta Tags: {len(security_meta)}")
             for meta in security_meta:
-                content = meta.get('content', '')
-                info_parts.append(f"  - {meta.get('http-equiv')}: {content[:80]}")
+                content_raw = meta.get('content', '')
+                content = str(content_raw) if content_raw else ''
+                http_equiv = meta.get('http-equiv', '')
+                info_parts.append(f"  - {http_equiv}: {content[:80]}")
         
         # Check for potential security issues
         security_issues = []
         
         # Check for inline event handlers (XSS risk)
-        inline_handlers = soup.find_all(attrs=lambda x: x and any(k.startswith('on') for k in x.keys()))
+        inline_handlers = []
+        for tag in soup.find_all():
+            if tag.attrs and isinstance(tag.attrs, dict):
+                if any(k.startswith('on') for k in tag.attrs.keys()):
+                    inline_handlers.append(tag)
         if inline_handlers:
             security_issues.append(f"Found {len(inline_handlers)} elements with inline event handlers (potential XSS risk)")
         
@@ -144,7 +172,13 @@ def browse_url(url: str) -> str:
             security_issues.append(f"Found {len(password_fields)} password field(s) on non-HTTPS page (CRITICAL)")
         
         # Check for autocomplete on sensitive fields
-        sensitive_autocomplete = soup.find_all('input', attrs={'autocomplete': lambda x: x and x in ['off', 'false']})
+        sensitive_autocomplete = []
+        for inp in soup.find_all('input'):
+            autocomplete = inp.get('autocomplete')
+            if autocomplete:
+                autocomplete_str = str(autocomplete).lower()
+                if autocomplete_str in ['off', 'false']:
+                    sensitive_autocomplete.append(inp)
         if sensitive_autocomplete:
             security_issues.append(f"Found {len(sensitive_autocomplete)} input(s) with autocomplete disabled (may indicate sensitive data)")
         
@@ -155,7 +189,11 @@ def browse_url(url: str) -> str:
         
         # API endpoints and data attributes
         api_indicators = []
-        data_attrs = soup.find_all(attrs=lambda x: x and any(k.startswith('data-') for k in x.keys()))
+        data_attrs = []
+        for tag in soup.find_all():
+            if tag.attrs and isinstance(tag.attrs, dict):
+                if any(k.startswith('data-') for k in tag.attrs.keys()):
+                    data_attrs.append(tag)
         if data_attrs:
             api_indicators.append(f"Found {len(data_attrs)} elements with data-* attributes (may indicate API endpoints)")
         
@@ -186,9 +224,13 @@ def browse_url(url: str) -> str:
         return report
         
     except requests.exceptions.RequestException as e:
-        return f"Error browsing {url}: Network error - {str(e)}"
+        error_msg = f"Error browsing {url}: Network error - {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
     except Exception as e:
-        return f"Error browsing {url}: {str(e)}"
+        error_msg = f"Error browsing {url}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
 
 
 def get_browse_tool() -> StructuredTool:

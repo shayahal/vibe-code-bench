@@ -17,6 +17,9 @@ from collections import deque
 from typing import Set, Dict, List, Optional
 from langchain_core.tools import StructuredTool
 import time
+from vibe_code_bench.core.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class WebsiteCrawler:
@@ -183,10 +186,11 @@ class WebsiteCrawler:
                     pass  # Could add regex extraction here
         
         # Look for data-* attributes that might indicate endpoints
-        for tag in soup.find_all(attrs=lambda x: x and any(k.startswith('data-') for k in x.keys())):
-            for attr, value in tag.attrs.items():
-                if attr.startswith('data-') and isinstance(value, str) and value.startswith('/'):
-                    self.all_endpoints.add(urljoin(page_url, value))
+        for tag in soup.find_all():
+            if tag.attrs and isinstance(tag.attrs, dict):
+                for attr, value in tag.attrs.items():
+                    if attr.startswith('data-') and isinstance(value, str) and value.startswith('/'):
+                        self.all_endpoints.add(urljoin(page_url, value))
     
     def crawl_page(self, url: str, current_depth: int = 0) -> Optional[Dict]:
         """Crawl a single page and extract information."""
@@ -256,6 +260,16 @@ class WebsiteCrawler:
             
         except requests.exceptions.RequestException as e:
             error_msg = f"Error crawling {normalized_url}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            self.errors.append(error_msg)
+            return {
+                'url': normalized_url,
+                'status': 'error',
+                'error': str(e)
+            }
+        except Exception as e:
+            error_msg = f"Unexpected error crawling {normalized_url}: {str(e)}"
+            logger.error(error_msg, exc_info=True)
             self.errors.append(error_msg)
             return {
                 'url': normalized_url,
@@ -456,8 +470,14 @@ def crawl_website(
         
         return output
         
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Error crawling website {url}: Network error - {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
     except Exception as e:
-        return f"Error crawling website {url}: {str(e)}"
+        error_msg = f"Error crawling website {url}: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return error_msg
 
 
 def get_crawl_website_tool() -> StructuredTool:
