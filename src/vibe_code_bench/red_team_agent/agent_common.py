@@ -8,9 +8,10 @@ and provide reusable agent functionality.
 import os
 import sys
 import time
+import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple, Any
+from typing import Optional, Tuple, Any, Dict
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -20,7 +21,10 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 from langfuse import Langfuse
-from vibe_code_bench.core.cached_llm import wrap_llm_with_cache
+
+from vibe_code_bench.core.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 def initialize_langfuse() -> Tuple[Langfuse, LangfuseCallbackHandler]:
@@ -38,9 +42,9 @@ def initialize_langfuse() -> Tuple[Langfuse, LangfuseCallbackHandler]:
     langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
     
     if not langfuse_secret_key or not langfuse_public_key:
-        print("Error: LangFuse credentials not found.")
-        print("  Please set LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY in your .env file.")
-        print("  You can get these from https://cloud.langfuse.com")
+        logger.error("LangFuse credentials not found")
+        logger.error("Please set LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY in your .env file")
+        logger.error("You can get these from https://cloud.langfuse.com")
         sys.exit(1)
     
     try:
@@ -51,12 +55,12 @@ def initialize_langfuse() -> Tuple[Langfuse, LangfuseCallbackHandler]:
         )
         
         langfuse_handler = LangfuseCallbackHandler()
-        print(f"✓ LangFuse initialized (host: {langfuse_host})")
-        print("  Using LangChain integration - all traces will be automatically captured")
+        logger.info(f"LangFuse initialized (host: {langfuse_host})")
+        logger.debug("Using LangChain integration - all traces will be automatically captured")
         return langfuse_client, langfuse_handler
     except Exception as e:
-        print(f"Error initializing LangFuse: {e}")
-        print("  Make sure LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY are set in your .env file")
+        logger.error(f"Error initializing LangFuse: {e}")
+        logger.error("Make sure LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY are set in your .env file")
         sys.exit(1)
 
 
@@ -83,7 +87,7 @@ def initialize_llm(
     """
     api_key = api_key or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        print("Error: OPENROUTER_API_KEY not found. Set it as env var or use --api-key")
+        logger.error("OPENROUTER_API_KEY not found. Set it as env var or use --api-key")
         sys.exit(1)
     
     try:
@@ -99,11 +103,9 @@ def initialize_llm(
             },
             callbacks=[langfuse_handler]
         )
-        # Wrap LLM with caching
-        llm = wrap_llm_with_cache(llm)
         return llm
     except Exception as e:
-        print(f"Error initializing LLM: {e}")
+        logger.error(f"Error initializing LLM: {e}")
         sys.exit(1)
 
 
@@ -141,7 +143,7 @@ def create_and_run_agent(
             debug=False
         )
     except Exception as e:
-        print(f"Error creating agent: {e}")
+        logger.error(f"Error creating agent: {e}")
         sys.exit(1)
     
     trace_name = f"Security Assessment - {url} - Run {run_id}"
@@ -153,21 +155,22 @@ def create_and_run_agent(
     except:
         pass
     
-    # Print assessment header
-    print(f"\n🔴 Red Team Security Assessment")
-    print("=" * 60)
-    print(f"Target URL: {url}")
-    if model_name != "anthropic/claude-3-haiku":  # Only print if not default
-        print(f"Model: {model_name}")
-    print(f"Run ID: {run_id}")
-    print("=" * 60)
-    print("The agent will perform automated security testing:")
-    print("  • Security headers analysis")
-    print("  • XSS vulnerability testing")
-    print("  • SQL injection testing")
-    print("  • Authentication mechanism analysis")
-    print("  • Comprehensive security report generation")
-    print("=" * 60)
+    # Log assessment header
+    logger.info("=" * 60)
+    logger.info("Red Team Security Assessment")
+    logger.info("=" * 60)
+    logger.info(f"Target URL: {url}")
+    if model_name != "anthropic/claude-3-haiku":  # Only log if not default
+        logger.info(f"Model: {model_name}")
+    logger.info(f"Run ID: {run_id}")
+    logger.info("=" * 60)
+    logger.info("The agent will perform automated security testing:")
+    logger.info("  • Security headers analysis")
+    logger.info("  • XSS vulnerability testing")
+    logger.info("  • SQL injection testing")
+    logger.info("  • Authentication mechanism analysis")
+    logger.info("  • Comprehensive security report generation")
+    logger.info("=" * 60)
     
     user_message = f"Perform a comprehensive security assessment on: {url}"
     start_time = time.time()
@@ -254,46 +257,50 @@ def flush_langfuse(
             langfuse_handler.langfuse.flush()
             flush_success = True
     except Exception as e:
-        print(f"  Warning: Error flushing handler: {e}")
+        logger.warning(f"Error flushing LangFuse handler: {e}")
     
     try:
         langfuse_client.flush()
         flush_success = True
     except Exception as e:
-        print(f"  Warning: Error flushing client: {e}")
+        logger.warning(f"Error flushing LangFuse client: {e}")
     
     if flush_success:
         time.sleep(5)
+        logger.debug("LangFuse data flushed successfully")
     else:
-        print("  Warning: Flush may have failed - trace might not be available immediately")
+        logger.warning("LangFuse flush may have failed - trace might not be available immediately")
     
     # Verify trace if available
     if trace_id:
         try:
             trace = langfuse_client.trace(id=trace_id)
             if trace:
-                print(f"  ✓ Trace verified in LangFuse")
-        except Exception:
-            pass
+                logger.debug(f"Trace verified in LangFuse: {trace_id}")
+        except Exception as e:
+            logger.debug(f"Could not verify trace in LangFuse: {e}")
 
 
 def save_report(
     report: str,
     run_id: str,
-    report_dir_path: str = None
-) -> Path:
+    report_dir_path: str = None,
+    structured_report: Dict[str, Any] = None
+) -> Tuple[Path, Optional[Path]]:
     """
-    Save report to file.
+    Save report to file (both markdown and JSON formats).
     
     Args:
-        report: Report content
+        report: Report content (markdown)
         run_id: Run ID for filename
         report_dir_path: Optional path to report directory (default: standard reports dir)
+        structured_report: Optional structured report dictionary (JSON format)
         
     Returns:
-        Absolute Path to saved report file
+        Tuple of (markdown_file_path, json_file_path)
     """
     from vibe_code_bench.core.paths import get_reports_dir, get_absolute_path
+    from vibe_code_bench.red_team_agent.structured_report import save_structured_report
     
     if report_dir_path:
         report_dir = get_absolute_path(report_dir_path)
@@ -301,9 +308,23 @@ def save_report(
         report_dir = get_reports_dir()
     
     report_dir.mkdir(parents=True, exist_ok=True)
-    report_file = report_dir / f"run_report_{run_id}.md"
-    report_file.write_text(report, encoding='utf-8')
-    return report_file
+    
+    # Save markdown report
+    md_file = report_dir / f"run_report_{run_id}.md"
+    md_file.write_text(report, encoding='utf-8')
+    
+    # Save structured JSON report if provided
+    json_file = None
+    if structured_report:
+        json_file = save_structured_report(
+            structured_report=structured_report,
+            run_id=run_id,
+            report_dir_path=report_dir_path
+        )
+    else:
+        logger.warning("No structured report provided - only markdown report saved")
+    
+    return md_file, json_file
 
 
 def print_results(
@@ -311,30 +332,37 @@ def print_results(
     run_id: str,
     trace_id: Optional[str],
     langfuse_host: str,
-    report_file: Path
+    md_file: Path,
+    json_file: Optional[Path] = None
 ):
     """
-    Print results and observability information.
+    Log results and observability information.
     
     Args:
         output: Agent output
         run_id: Run ID
         trace_id: Optional trace ID
         langfuse_host: LangFuse host URL
-        report_file: Path to saved report file
+        md_file: Path to saved markdown report file
+        json_file: Optional path to saved JSON structured report file
     """
-    print("\nResult:")
-    print("-" * 60)
-    print(output)
-    print("-" * 60)
-    print(f"\n✓ All observability data logged to LangFuse")
-    print(f"  - Check your LangFuse dashboard: {langfuse_host}")
-    print(f"  - Run ID: {run_id} (use this to filter traces)")
+    logger.info("=" * 60)
+    logger.info("Assessment Result")
+    logger.info("=" * 60)
+    logger.info(output)
+    logger.info("=" * 60)
+    logger.info("All observability data logged to LangFuse")
+    logger.info(f"Check your LangFuse dashboard: {langfuse_host}")
+    logger.info(f"Run ID: {run_id} (use this to filter traces)")
     if trace_id:
-        print(f"  - Trace ID: {trace_id}")
-        print(f"  - Direct Trace Link: {langfuse_host}/traces/{trace_id}")
-        print(f"  Note: Traces may take a few seconds to appear in the dashboard")
+        logger.info(f"Trace ID: {trace_id}")
+        logger.info(f"Direct Trace Link: {langfuse_host}/traces/{trace_id}")
+        logger.debug("Traces may take a few seconds to appear in the dashboard")
     else:
-        print(f"  Note: Trace ID not available - check dashboard for recent traces")
-    print(f"\n✓ Run report generated: {report_file}")
+        logger.warning("Trace ID not available - check dashboard for recent traces")
+    logger.info(f"Markdown report generated: {md_file}")
+    if json_file:
+        logger.info(f"Structured JSON report generated: {json_file}")
+    else:
+        logger.warning("Structured JSON report not generated")
 

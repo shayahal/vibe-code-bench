@@ -11,7 +11,6 @@ from .paths import (
     get_runs_dir,
     get_reports_dir,
     get_logs_dir,
-    get_cache_dir,
     get_resources_dir,
     get_absolute_path,
 )
@@ -26,7 +25,6 @@ __all__ = [
     'get_runs_dir',
     'get_reports_dir',
     'get_logs_dir',
-    'get_cache_dir',
     'get_resources_dir',
     'get_absolute_path',
 ]

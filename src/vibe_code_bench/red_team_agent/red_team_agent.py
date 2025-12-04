@@ -13,6 +13,7 @@ import os
 import sys
 import argparse
 import time
+import logging
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -34,6 +35,12 @@ from vibe_code_bench.red_team_agent.agent_common import (
 from vibe_code_bench.red_team_agent.tools import get_all_tools, browse_url
 from vibe_code_bench.red_team_agent.report_generator import generate_run_report
 from vibe_code_bench.red_team_agent.red_team_prompt import RED_TEAM_AGENT_PROMPT
+
+# Import logging setup
+from vibe_code_bench.core.logging_setup import setup_logging, get_logger
+from vibe_code_bench.core.run_directory import setup_run_directory
+
+logger = get_logger(__name__)
 
 
 def main():
@@ -61,6 +68,14 @@ def main():
     
     args = parser.parse_args()
     
+    # Create run directory and set up logging
+    run_dir = setup_run_directory(subdir="red_team_agent")
+    # Extract timestamp from run directory name (run_dir.name is "run_TIMESTAMP")
+    run_id = run_dir.name.replace("run_", "") if run_dir.name.startswith("run_") else run_dir.name
+    setup_logging(run_dir=run_dir)
+    
+    logger.info(f"Starting Red Team Agent - Run ID: {run_id}")
+    
     # Initialize LangFuse
     langfuse_client, langfuse_handler = initialize_langfuse()
     langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
@@ -73,16 +88,13 @@ def main():
         langfuse_handler=langfuse_handler,
         title="Red Team Agent"
     )
-    print(f"✓ Using model: {model_name}")
+    logger.info(f"Using model: {model_name}")
     
     # Get all available tools
     all_tools = get_all_tools()
-    print(f"✓ Loaded {len(all_tools)} security testing tools:")
+    logger.info(f"Loaded {len(all_tools)} security testing tools")
     for tool in all_tools:
-        print(f"  - {tool.name}")
-    
-    # Generate run ID
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        logger.debug(f"  - {tool.name}")
     
     try:
         # Run agent
@@ -97,8 +109,8 @@ def main():
             run_id=run_id
         )
         
-        # Generate report
-        report = generate_run_report(
+        # Generate report (both markdown and structured)
+        report, structured_report = generate_run_report(
             llm=llm,
             langfuse_client=langfuse_client,
             url=args.url,
@@ -109,42 +121,41 @@ def main():
             model_name=model_name
         )
         
-        # Save report (uses standard reports directory)
-        report_file = save_report(report, run_id)
+        # Save reports (both markdown and JSON)
+        md_file, json_file = save_report(report, run_id, structured_report=structured_report)
         
         # Print results
-        print_results(output, run_id, trace_id, langfuse_host, report_file)
+        print_results(output, run_id, trace_id, langfuse_host, md_file, json_file)
         
     except Exception as e:
-        start_time = time.time()
-        execution_time = 0  # Will be calculated after fallback
-        
-        execution_time = time.time() - start_time
-        print(f"Error running agent: {e}")
-        print("\nFalling back to direct tool call...")
+        logger.error(f"Error running agent: {e}", exc_info=True)
+        logger.warning("Falling back to direct tool call")
         result = browse_url(args.url)
-        print("\nResult:")
-        print("-" * 60)
-        print(result)
-        print("-" * 60)
+        logger.info("=" * 60)
+        logger.info("Direct Tool Call Result")
+        logger.info("=" * 60)
+        logger.info(result)
+        logger.info("=" * 60)
         
         # Generate basic report on error
         try:
             error_run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            report = generate_run_report(
+            report, structured_report = generate_run_report(
                 llm=llm,
                 langfuse_client=langfuse_client,
                 url=args.url,
                 output=result,
-                execution_time=execution_time,
+                execution_time=0,
                 langfuse_handler=langfuse_handler,
                 run_id=error_run_id,
                 model_name=model_name
             )
-            report_file = save_report(report, error_run_id)
-            print(f"\n✓ Run report generated: {report_file}")
+            md_file, json_file = save_report(report, error_run_id, structured_report=structured_report)
+            logger.info(f"Run report generated: {md_file}")
+            if json_file:
+                logger.info(f"Structured report generated: {json_file}")
         except Exception as report_error:
-            print(f"\n⚠ Could not generate report: {report_error}")
+            logger.error(f"Could not generate report: {report_error}", exc_info=True)
 
 
 if __name__ == "__main__":

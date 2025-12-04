@@ -60,7 +60,6 @@ def get_data_dir() -> Path:
           runs/          - All run directories
           reports/       - All reports
           logs/          - All logs
-          cache/         - Cache files (LLM cache, etc.)
           resources/     - Resources and static files
     
     Returns:
@@ -106,18 +105,6 @@ def get_logs_dir() -> Path:
     logs_dir = get_data_dir() / "logs"
     logs_dir.mkdir(exist_ok=True)
     return logs_dir
-
-
-def get_cache_dir() -> Path:
-    """
-    Get the standard cache directory.
-    
-    Returns:
-        Path to cache directory (created if doesn't exist)
-    """
-    cache_dir = get_data_dir() / "cache"
-    cache_dir.mkdir(exist_ok=True)
-    return cache_dir
 
 
 def get_resources_dir() -> Path:

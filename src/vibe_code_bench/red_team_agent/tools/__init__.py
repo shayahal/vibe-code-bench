@@ -37,6 +37,7 @@ def truncate_output(output: str, max_length: int = 500) -> str:
 
 # Import tool functions
 from .browse_tool import browse_url, get_browse_tool
+from .crawl_website_tool import crawl_website, get_crawl_website_tool
 from .security_headers_tool import analyze_security_headers, get_security_headers_tool
 from .xss_test_tool import test_xss_patterns, get_xss_test_tool
 from .sqli_test_tool import test_sql_injection_patterns, get_sqli_test_tool
@@ -47,6 +48,7 @@ from .security_report_tool import generate_security_report, get_security_report_
 # Maps tool names to their StructuredTool factory functions
 TOOLS_REGISTRY: Dict[str, Callable[[], StructuredTool]] = {
     "browse_url": get_browse_tool,
+    "crawl_website": get_crawl_website_tool,
     "analyze_security_headers": get_security_headers_tool,
     "test_xss_patterns": get_xss_test_tool,
     "test_sql_injection_patterns": get_sqli_test_tool,
@@ -97,6 +99,8 @@ __all__ = [
     "get_all_tools",
     "browse_url",
     "get_browse_tool",
+    "crawl_website",
+    "get_crawl_website_tool",
     "analyze_security_headers",
     "get_security_headers_tool",
     "test_xss_patterns",

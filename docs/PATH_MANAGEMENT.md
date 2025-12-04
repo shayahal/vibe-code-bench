@@ -15,7 +15,6 @@ data/
 ├── runs/          # All run directories (organized by subdirectory and timestamp)
 ├── reports/       # All reports
 ├── logs/          # All logs
-├── cache/         # Cache files (LLM cache, etc.)
 └── resources/     # Resources and static files
 ```
 
@@ -29,7 +28,6 @@ from vibe_code_bench.core.paths import (
     get_runs_dir,        # Get data/runs/ directory
     get_reports_dir,     # Get data/reports/ directory
     get_logs_dir,        # Get data/logs/ directory
-    get_cache_dir,       # Get data/cache/ directory
     get_resources_dir,   # Get data/resources/ directory
     get_absolute_path,   # Resolve any path to absolute from repo root
 )
@@ -71,13 +69,10 @@ user_path = get_absolute_path("../other/config.json")  # Also works
 ### Working with Standard Directories
 
 ```python
-from vibe_code_bench.core.paths import get_reports_dir, get_cache_dir
+from vibe_code_bench.core.paths import get_reports_dir
 
 # Save evaluation results
 eval_file = get_reports_dir() / "evaluation_results.json"
-
-# Cache file
-cache_file = get_cache_dir() / "llm" / "cache.json"
 ```
 
 ## Rules
@@ -141,7 +136,7 @@ output_file = Path("output.json")
 
 If you encounter old code using relative paths:
 
-1. Identify what type of file it is (report, log, cache, etc.)
+1. Identify what type of file it is (report, log, etc.)
 2. Use the appropriate standard directory function
 3. Replace relative paths with absolute paths using `get_absolute_path()`
 4. Remove any `sys.path.insert()` statements

@@ -7,7 +7,7 @@ Generates comprehensive run reports using LLM based on execution data.
 import os
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Set
+from typing import TYPE_CHECKING, List, Set, Tuple, Dict, Any
 
 if TYPE_CHECKING:
     from langchain_anthropic import ChatAnthropic
@@ -217,7 +217,7 @@ def generate_run_report(
     langfuse_handler: "LangfuseCallbackHandler",
     run_id: str = None,
     model_name: str = "anthropic/claude-3-haiku"
-) -> str:
+) -> Tuple[str, Dict[str, Any]]:
     """
     Generate a run report using the LLM based on LangFuse trace data.
     
@@ -243,6 +243,11 @@ def generate_run_report(
                 trace_id = langfuse_handler.get_trace_id()
         except:
             pass
+        
+        # Import structured report generator
+        from vibe_code_bench.red_team_agent.structured_report import (
+            generate_structured_report
+        )
         
         # Deduplicate agent output before generating report
         deduplicated_output = deduplicate_output(output)
@@ -277,7 +282,17 @@ def generate_run_report(
 **Note:** Search for "run_id: {run_id}" in LangFuse to find all traces for this run.
 """
         
-        return full_report
+        # Generate structured report
+        structured_report = generate_structured_report(
+            markdown_report=full_report,
+            url=url,
+            model_name=model_name,
+            execution_time=execution_time,
+            run_id=run_id or "unknown",
+            trace_id=trace_id
+        )
+        
+        return full_report, structured_report
         
     except Exception as e:
         # Fallback report if generation fails
@@ -317,4 +332,47 @@ All execution traces, token usage, and costs are logged to LangFuse. Check the L
 
 **Note:** Report generation encountered an error: {str(e)}
 """
+        
+        # Generate minimal structured report on error
+        from vibe_code_bench.red_team_agent.structured_report import (
+            generate_structured_report
+        )
+        
+        try:
+            structured_report = generate_structured_report(
+                markdown_report=fallback_report,
+                url=url,
+                model_name=model_name,
+                execution_time=execution_time,
+                run_id=run_id or "unknown",
+                trace_id=None
+            )
+        except Exception:
+            # If structured report generation also fails, create minimal structure
+            structured_report = {
+                "meta": {
+                    "run_id": run_id or "unknown",
+                    "ts": datetime.now().isoformat(),
+                    "url": url,
+                    "model": model_name,
+                    "duration": round(execution_time, 2),
+                    "error": str(e),
+                    "v": "1.0"
+                },
+                "summary": {
+                    "total": 0,
+                    "found": 0,
+                    "not_found": 0,
+                    "detection_rate": 0.0,
+                    "risk_level": "Unknown",
+                    "key_issues": ["Report generation failed"]
+                },
+                "vulnerabilities": [],
+                "metrics": {
+                    "by_severity": {},
+                    "by_type": {}
+                }
+            }
+        
+        return fallback_report, structured_report
 

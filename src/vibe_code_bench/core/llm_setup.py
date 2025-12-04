@@ -8,7 +8,6 @@ from typing import Optional, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
-from vibe_code_bench.core.cached_llm import wrap_llm_with_cache
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 
@@ -126,9 +125,6 @@ def initialize_llm(
             f"Unknown provider: {provider}. "
             f"Supported providers: 'openrouter', 'anthropic', 'openai'"
         )
-    
-    # Wrap LLM with caching
-    llm = wrap_llm_with_cache(llm)
     
     return llm, model_name
 

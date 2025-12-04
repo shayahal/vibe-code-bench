@@ -11,7 +11,6 @@ from langchain_openai import ChatOpenAI
 import os
 
 from vibe_code_bench.orchestrator.state import OrchestratorState
-from vibe_code_bench.core.cached_llm import wrap_llm_with_cache
 
 
 # System prompt for the supervisor
@@ -66,9 +65,6 @@ def create_supervisor_chain(model_name: str = "anthropic/claude-3-haiku"):
             "X-Title": "Orchestrator Supervisor"
         }
     )
-    
-    # Wrap LLM with caching
-    llm = wrap_llm_with_cache(llm)
     
     prompt = ChatPromptTemplate.from_messages([
         ("system", SUPERVISOR_PROMPT),

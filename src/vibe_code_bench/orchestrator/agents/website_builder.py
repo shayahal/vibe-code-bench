@@ -12,8 +12,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from vibe_code_bench.orchestrator.state import OrchestratorState
 from vibe_code_bench.core.llm_setup import initialize_llm
+from vibe_code_bench.core.logging_setup import get_logger
 from vibe_code_bench.website_generator.prompts import SYSTEM_PROMPT, USER_PROMPT
 from vibe_code_bench.website_generator.main import parse_json_response, write_files, ensure_main_py
+
+logger = get_logger(__name__)
 
 
 def website_builder_node(state: OrchestratorState) -> OrchestratorState:
@@ -26,9 +29,9 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     Returns:
         Updated state with build_result and website_dir
     """
-    print("\n" + "="*60)
-    print("STEP 1: Building Website")
-    print("="*60)
+    logger.info("="*60)
+    logger.info("STEP 1: Building Website")
+    logger.info("="*60)
     
     # Get prompt from state or use default
     prompt = state.get("prompt") or USER_PROMPT
@@ -36,6 +39,7 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     # Get output directory from state (should be set by orchestrator)
     output_dir = state.get("output_dir")
     if not output_dir:
+        logger.error("output_dir not set in state")
         raise ValueError("output_dir not set in state")
     
     # Create run directory
@@ -43,6 +47,7 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     run_dir = output_dir / f"run_{run_id}"
     website_dir = run_dir / "website"
     website_dir.mkdir(parents=True, exist_ok=True)
+    logger.debug(f"Created website directory: {website_dir}")
     
     # Use main.py's approach: SYSTEM_PROMPT + USER_PROMPT
     system_prompt = SYSTEM_PROMPT
@@ -51,6 +56,7 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     # Initialize LLM
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
+        logger.error("OPENROUTER_API_KEY not found")
         raise Exception("OPENROUTER_API_KEY not found")
     
     website_builder_model = state.get("website_builder_model", "anthropic/claude-3-haiku")
@@ -65,11 +71,12 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     # Increase max_tokens for website generation
     if hasattr(llm, 'max_tokens'):
         llm.max_tokens = 8000
+        logger.debug(f"Set max_tokens to {llm.max_tokens}")
     
-    print(f"✓ Using model: {model_name}")
+    logger.info(f"Using model: {model_name}")
     
     # Invoke LLM
-    print("Generating website code...")
+    logger.info("Generating website code")
     start_time = time.time()
     response = llm.invoke([
         SystemMessage(content=system_prompt),
@@ -83,25 +90,26 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
         response_text = str(response)
     
     execution_time = time.time() - start_time
-    print(f"✓ Generated {len(response_text)} characters in {execution_time:.2f}s")
+    logger.info(f"Generated {len(response_text)} characters in {execution_time:.2f}s")
+    logger.debug(f"Response preview: {response_text[:200]}...")
     
     # Parse JSON response using main.py's robust parser
-    print("Parsing JSON response...")
+    logger.info("Parsing JSON response")
     # Use main.py's parse_json_response function which handles markdown code blocks, etc.
     files = parse_json_response(response_text)
-    print(f"✓ Parsed {len(files)} files")
+    logger.info(f"Parsed {len(files)} files")
     
     # Ensure main.py exists
     files = ensure_main_py(files)
     
     # Write files using main.py's function
-    print("Writing files...")
+    logger.info("Writing files")
     created_files = write_files(files, website_dir)
     
-    print(f"✓ Website built successfully")
-    print(f"  Execution time: {execution_time:.2f}s")
-    print(f"  Output directory: {website_dir}")
-    print(f"  Files created: {len(created_files)}")
+    logger.info("Website built successfully")
+    logger.info(f"Execution time: {execution_time:.2f}s")
+    logger.info(f"Output directory: {website_dir}")
+    logger.info(f"Files created: {len(created_files)}")
     
     # Update state
     build_result = {

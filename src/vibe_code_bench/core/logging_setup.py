@@ -1,31 +1,75 @@
 """
 Unified logging configuration for all agents.
+
+This module provides a centralized logging system with:
+- Separate file handles for each log level (DEBUG, INFO, WARNING, ERROR)
+- Console output for user feedback (INFO and above)
+- Consistent formatting across all modules
+- No print statements - all output goes through logging
+
+Log Level Guidelines:
+- DEBUG: Non-important information, detailed execution traces
+- INFO: Logical steps in the process, interesting events, normal operation
+- WARNING: Things that aren't perfect but don't break the flow
+- ERROR: Things that went wrong, exceptions, failures
 """
 
 import logging
+import sys
 from pathlib import Path
+from typing import Optional
 
-logger = logging.getLogger(__name__)
+# Global logger instance - use get_logger() to get module-specific loggers
+_root_logger_configured = False
 
 
-def setup_file_logging(run_dir: Path) -> None:
+def get_logger(name: Optional[str] = None) -> logging.Logger:
     """
-    Set up file logging for the current run with separate files for each log level.
-    Used by both red team agent and website creator agent.
+    Get a logger instance for a module.
+    
+    This is the unified API for all logging in the system.
+    Use this instead of logging.getLogger() directly.
     
     Args:
-        run_dir: Path to the run directory
+        name: Logger name (typically __name__). If None, returns root logger.
+        
+    Returns:
+        Logger instance configured with the unified logging system
     """
-    # Get the root logger to ensure all loggers inherit the handlers
+    if name is None:
+        return logging.getLogger()
+    return logging.getLogger(name)
+
+
+def setup_logging(run_dir: Optional[Path] = None, console_level: int = logging.INFO) -> None:
+    """
+    Set up unified logging system with separate file handles for each log level.
+    
+    This function:
+    - Creates separate log files for DEBUG, INFO, WARNING, and ERROR
+    - Adds console handler for user feedback (INFO and above by default)
+    - Configures all loggers to use the same handlers
+    - Should be called once at application startup
+    
+    Args:
+        run_dir: Optional path to run directory. If provided, creates log files there.
+                 If None, only console logging is configured.
+        console_level: Minimum log level for console output (default: INFO)
+    """
+    global _root_logger_configured
+    
     root_logger = logging.getLogger()
     
-    # Remove existing file handlers
-    for handler in root_logger.handlers[:]:
-        if isinstance(handler, logging.FileHandler):
-            root_logger.removeHandler(handler)
+    # Only configure once
+    if _root_logger_configured:
+        root_logger.debug("Logging already configured, skipping reconfiguration")
+        return
     
-    logs_dir = run_dir / "logs"
-    logs_dir.mkdir(exist_ok=True)
+    # Remove existing handlers to avoid duplicates
+    root_logger.handlers.clear()
+    
+    # Set root logger level to DEBUG to capture everything
+    root_logger.setLevel(logging.DEBUG)
     
     # Create formatters
     detailed_formatter = logging.Formatter(
@@ -36,35 +80,59 @@ def setup_file_logging(run_dir: Path) -> None:
         '%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+    console_formatter = logging.Formatter(
+        '%(levelname)s - %(message)s'
+    )
     
-    # DEBUG log - DEBUG and above (most verbose)
-    debug_handler = logging.FileHandler(logs_dir / "agent.debug", mode='w')
-    debug_handler.setLevel(logging.DEBUG)
-    debug_handler.setFormatter(detailed_formatter)
-    root_logger.addHandler(debug_handler)
+    # Console handler - for user feedback (INFO and above)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(console_level)
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
     
-    # INFO log - INFO and above (normal operation + errors)
-    info_handler = logging.FileHandler(logs_dir / "agent.info", mode='w')
-    info_handler.setLevel(logging.INFO)
-    info_handler.setFormatter(simple_formatter)
-    root_logger.addHandler(info_handler)
+    # File handlers (only if run_dir is provided)
+    if run_dir:
+        logs_dir = run_dir / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        # DEBUG log - DEBUG and above (most verbose, detailed formatter)
+        debug_handler = logging.FileHandler(logs_dir / "agent.debug", mode='w', encoding='utf-8')
+        debug_handler.setLevel(logging.DEBUG)
+        debug_handler.setFormatter(detailed_formatter)
+        root_logger.addHandler(debug_handler)
+        
+        # INFO log - INFO and above (normal operation)
+        info_handler = logging.FileHandler(logs_dir / "agent.info", mode='w', encoding='utf-8')
+        info_handler.setLevel(logging.INFO)
+        info_handler.setFormatter(simple_formatter)
+        root_logger.addHandler(info_handler)
+        
+        # WARNING log - WARNING and above (issues, non-critical problems)
+        warning_handler = logging.FileHandler(logs_dir / "agent.warning", mode='w', encoding='utf-8')
+        warning_handler.setLevel(logging.WARNING)
+        warning_handler.setFormatter(simple_formatter)
+        root_logger.addHandler(warning_handler)
+        
+        # ERROR log - ERROR and CRITICAL only (failures, exceptions)
+        error_handler = logging.FileHandler(logs_dir / "agent.error", mode='w', encoding='utf-8')
+        error_handler.setLevel(logging.ERROR)
+        error_handler.setFormatter(detailed_formatter)
+        root_logger.addHandler(error_handler)
+        
+        root_logger.info(f"Logging configured - log files created in: {logs_dir}")
+    else:
+        root_logger.info("Logging configured - console output only")
     
-    # WARNING log - WARNING and above (security issues, errors)
-    warning_handler = logging.FileHandler(logs_dir / "agent.warning", mode='w')
-    warning_handler.setLevel(logging.WARNING)
-    warning_handler.setFormatter(simple_formatter)
-    root_logger.addHandler(warning_handler)
+    root_logger.debug("DEBUG logging enabled")
+    _root_logger_configured = True
+
+
+def setup_file_logging(run_dir: Path) -> None:
+    """
+    Legacy function name - calls setup_logging() for backward compatibility.
     
-    # ERROR log - ERROR and CRITICAL only (failures, exceptions)
-    error_handler = logging.FileHandler(logs_dir / "agent.error", mode='w')
-    error_handler.setLevel(logging.ERROR)
-    error_handler.setFormatter(detailed_formatter)
-    root_logger.addHandler(error_handler)
-    
-    # Ensure the root logger captures everything so handlers can filter it
-    root_logger.setLevel(logging.DEBUG)
-    
-    # Use root logger to log the configuration message
-    root_logger.info(f"Logging configured - separate log files created in: {logs_dir}")
-    root_logger.debug("DEBUG logging enabled with detailed formatter")
+    Args:
+        run_dir: Path to the run directory
+    """
+    setup_logging(run_dir=run_dir)
 
