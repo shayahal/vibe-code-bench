@@ -31,6 +31,19 @@ IMPORTANT JSON RULES:
 - Keep code concise but functional - prioritize working code over verbose comments
 - If approaching token limit, ensure you close all JSON structures properly
 
+CRITICAL PYTHON INDENTATION RULES:
+- Use exactly 4 spaces for each indentation level (NO tabs, NO mixed spaces)
+- Flask routes (@app.route) must be at MODULE LEVEL (0 indentation, not inside lists/dicts)
+- Function definitions must be at MODULE LEVEL (0 indentation) unless inside a class
+- All code blocks (if, for, def, etc.) must be properly indented
+- Check that routes are NOT accidentally indented inside data structures (lists, dicts)
+- Example CORRECT structure:
+  businesses = [...]
+  
+  @app.route('/')  # Module level, 0 spaces
+  def index():     # Module level, 0 spaces
+      return ...   # Inside function, 4 spaces
+
 THINK STEP-BY-STEP BEFORE CODING:
 1. ANALYZE: Understand the business domain and requirements
 2. PLAN: Design complete website architecture:
@@ -82,7 +95,26 @@ FULL-FEATURED WEBSITE REQUIREMENTS:
 - Exactly ONE main.py: Complete Flask application with all routes, authentication, and payment handling
   * All HTML, CSS, JS files must be in the SAME directory as main.py
   * NO templates/ folder - serve files directly from current directory
-- Proper JSON: Escape newlines as \\n, quotes as \\"
+  * CRITICAL: main.py MUST actually run the Flask app, not just print a message
+  * main.py MUST include: app.run(debug=True, host='0.0.0.0', port=5000) or similar
+  * Example structure:
+    from flask import Flask, send_file, request, jsonify, session
+    app = Flask(__name__)
+    app.secret_key = 'your-secret-key-here'
+    
+    @app.route('/')
+    def index():
+        return send_file('index.html')
+    
+    # ... all other routes ...
+    
+    if __name__ == '__main__':
+        app.run(debug=True, host='0.0.0.0', port=5000)
+  * DO NOT create a placeholder main.py that only prints "Project created successfully!"
+  * The main.py MUST be a fully functional Flask application that can be run with: python main.py
+- Proper JSON: Escape newlines as \\n, quotes as \\", and control characters (tabs, carriage returns) as \\t and \\r
+  * CRITICAL: In JSON strings, use \\n for newlines, NOT actual newline characters
+  * All control characters (\\n, \\t, \\r) must be properly escaped in JSON strings
 
 Think through the entire architecture, then generate a rich, complete, full-featured website."""
 

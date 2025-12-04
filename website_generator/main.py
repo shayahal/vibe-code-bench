@@ -72,11 +72,82 @@ def create_unique_folder(base_dir: Path) -> Path:
     return website_dir
 
 
+def normalize_python_indentation(content: str) -> str:
+    """
+    Normalize Python file indentation to use 4 spaces consistently.
+    Fixes common indentation issues like mixed tabs/spaces or incorrect indentation.
+    
+    Args:
+        content: Python file content
+    
+    Returns:
+        Content with normalized indentation
+    """
+    lines = content.split('\n')
+    normalized = []
+    
+    # Patterns that should be at module level (0 indentation)
+    module_level_patterns = [
+        r'^@app\.route\(',
+        r'^from\s+',
+        r'^import\s+',
+        r'^app\s*=\s*Flask\(',
+        r'^if\s+__name__',
+    ]
+    
+    import re
+    
+    for i, line in enumerate(lines):
+        # Convert tabs to 4 spaces
+        line = line.replace('\t', '    ')
+        stripped = line.lstrip()
+        
+        if not stripped:  # Empty line
+            normalized.append('')
+            continue
+        
+        leading_spaces = len(line) - len(stripped)
+        
+        # Check if this line should be at module level
+        should_be_module_level = any(re.search(pattern, stripped) for pattern in module_level_patterns)
+        
+        # Also check for function definitions that should be at module level
+        # (not inside a class or other block)
+        if re.match(r'^def\s+\w+\(', stripped) and leading_spaces > 0:
+            # Check if we're inside a data structure (list/dict) by looking backwards
+            # If previous non-empty line ends with ] or ), this def is incorrectly indented
+            prev_idx = i - 1
+            while prev_idx >= 0 and not lines[prev_idx].strip():
+                prev_idx -= 1
+            
+            if prev_idx >= 0:
+                prev_line = lines[prev_idx].replace('\t', '    ')
+                prev_stripped = prev_line.lstrip()
+                # If previous line ends a data structure, this def should be at module level
+                if prev_stripped.endswith(']') or (prev_stripped.endswith(')') and ',' in prev_stripped):
+                    should_be_module_level = True
+        
+        # Fix incorrect indentation
+        if should_be_module_level and leading_spaces > 0:
+            # This should be at module level - remove indentation
+            normalized.append(stripped)
+        else:
+            # Normalize to 4-space increments
+            if leading_spaces > 0:
+                # Round to nearest 4-space increment
+                normalized_indent = ((leading_spaces + 2) // 4) * 4
+                normalized.append(' ' * normalized_indent + stripped)
+            else:
+                normalized.append(stripped)
+    
+    return '\n'.join(normalized)
+
+
 def ensure_main_py(files: dict) -> dict:
     """
-    Ensure there is exactly one main.py file.
+    Ensure there is exactly one main.py file with a proper Flask app.
     If multiple exist, keep the first one.
-    If none exist, create a placeholder.
+    If none exist or it's just a placeholder, create a proper Flask app.
     
     Args:
         files: Dictionary of filename -> content
@@ -92,26 +163,83 @@ def ensure_main_py(files: dict) -> dict:
         for f in main_py_files[1:]:
             del files[f]
     
-    elif len(main_py_files) == 0:
-        logger.info("No main.py found, creating placeholder main.py")
-        files["main.py"] = """#!/usr/bin/env python3
-\"\"\"
-Main entry point for the project.
-\"\"\"
-
-if __name__ == "__main__":
-    print("Project created successfully!")
-"""
-    
-    # Ensure it's exactly "main.py" (not in subdirectory)
-    if "main.py" not in files:
+    # Get the main.py content (if it exists)
+    main_py_content = None
+    if "main.py" in files:
+        main_py_content = files["main.py"]
+    else:
         # Check if there's a main.py in a subdirectory
         for key in list(files.keys()):
             if key.endswith("/main.py") or key.endswith("\\main.py"):
-                files["main.py"] = files.pop(key)
+                main_py_content = files.pop(key)
                 logger.info(f"Moved {key} to main.py")
                 break
     
+    # Check if main.py is just a placeholder or doesn't run Flask
+    if main_py_content:
+        # Normalize indentation first
+        try:
+            main_py_content = normalize_python_indentation(main_py_content)
+            logger.debug("Normalized main.py indentation")
+        except Exception as e:
+            logger.warning(f"Failed to normalize indentation: {e}")
+        
+        # Check if it's a placeholder (just prints success message)
+        if "print(\"Project created successfully!\")" in main_py_content or \
+           "print('Project created successfully!')" in main_py_content:
+            logger.warning("main.py is a placeholder, replacing with proper Flask app")
+            main_py_content = None  # Will be replaced below
+        # Check if it doesn't have app.run()
+        elif "app.run(" not in main_py_content and "Flask" in main_py_content:
+            logger.warning("main.py doesn't run Flask app, adding app.run()")
+            # Try to add app.run() if it's missing
+            if "if __name__ == '__main__':" in main_py_content:
+                main_py_content = main_py_content.replace(
+                    "if __name__ == '__main__':",
+                    "if __name__ == '__main__':\n    app.run(debug=True, host='0.0.0.0', port=5000)"
+                )
+            else:
+                main_py_content += "\n\nif __name__ == '__main__':\n    app.run(debug=True, host='0.0.0.0', port=5000)\n"
+    
+    # Create proper Flask app if needed
+    if not main_py_content or "Flask" not in main_py_content:
+        logger.info("Creating proper Flask app in main.py")
+        # Get list of HTML files to create routes for
+        html_files = [f for f in files.keys() if f.endswith('.html')]
+        routes = []
+        for html_file in html_files:
+            route_name = html_file.replace('.html', '').replace('_', '-')
+            if route_name == 'index':
+                routes.append("    @app.route('/')\n    def index():\n        return send_file('index.html')")
+            else:
+                routes.append(f"    @app.route('/{route_name}')\n    def {route_name.replace('-', '_')}():\n        return send_file('{html_file}')")
+        
+        main_py_content = f"""#!/usr/bin/env python3
+\"\"\"
+Flask application for serving the website.
+\"\"\"
+
+from flask import Flask, send_file
+
+app = Flask(__name__)
+app.secret_key = 'change-this-secret-key-in-production'
+
+{chr(10).join(routes)}
+
+# Serve static files
+@app.route('/styles.css')
+def styles():
+    return send_file('styles.css', mimetype='text/css')
+
+@app.route('/script.js')
+def script():
+    return send_file('script.js', mimetype='application/javascript')
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
+"""
+    
+    files["main.py"] = main_py_content
     return files
 
 
@@ -152,14 +280,81 @@ def parse_json_response(response_text: str) -> dict:
     if not response_text.startswith('{'):
         raise ValueError(f"Response does not start with {{. First 100 chars: {response_text[:100]}")
     
+    # Sanitize JSON: replace actual newlines/tabs in string values with escaped versions
+    # This handles cases where the LLM includes literal control characters instead of escaped ones
     try:
+        # First, try to parse as-is
         data = json.loads(response_text)
+        # Extract files from parsed data
         if "files" in data:
             return data["files"]
         else:
             # If response is just the files dict directly
             return data
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError as initial_error:
+        # If that fails, try to fix control characters in string values
+        error_str = str(initial_error).lower()
+        if 'control character' in error_str:
+            logger.warning("Found invalid control characters in JSON, attempting to sanitize...")
+            try:
+                # Manually fix control characters in string values
+                # We'll iterate through and replace literal control chars with escaped versions
+                sanitized = []
+                i = 0
+                in_string = False
+                escape_next = False
+                
+                while i < len(response_text):
+                    char = response_text[i]
+                    
+                    if escape_next:
+                        sanitized.append(char)
+                        escape_next = False
+                        i += 1
+                        continue
+                    
+                    if char == '\\':
+                        sanitized.append(char)
+                        escape_next = True
+                        i += 1
+                        continue
+                    
+                    if char == '"' and not escape_next:
+                        in_string = not in_string
+                        sanitized.append(char)
+                        i += 1
+                        continue
+                    
+                    if in_string:
+                        # Inside a string - replace control characters
+                        if char == '\n':
+                            sanitized.append('\\n')
+                        elif char == '\r':
+                            sanitized.append('\\r')
+                        elif char == '\t':
+                            sanitized.append('\\t')
+                        else:
+                            sanitized.append(char)
+                    else:
+                        # Outside string - keep as-is
+                        sanitized.append(char)
+                    
+                    i += 1
+                
+                sanitized_text = ''.join(sanitized)
+                data = json.loads(sanitized_text)
+                logger.info("Successfully sanitized JSON by replacing control characters")
+                # Extract files from parsed data
+                if "files" in data:
+                    return data["files"]
+                else:
+                    return data
+            except Exception as sanitize_error:
+                # If sanitization fails, fall through to salvage logic
+                logger.warning(f"Sanitization attempt failed: {sanitize_error}")
+        
+        # If control character fix didn't work, or it's a different error, try salvage logic
+        e = initial_error
         error_str = str(e).lower()
         
         # If it's an unterminated string (truncation), try to salvage what we can
@@ -247,6 +442,7 @@ def parse_json_response(response_text: str) -> dict:
 def write_files(files: dict, output_dir: Path) -> list:
     """
     Write all files to the output directory.
+    Normalizes Python file indentation before writing.
     
     Args:
         files: Dictionary of filename -> content
@@ -259,6 +455,14 @@ def write_files(files: dict, output_dir: Path) -> list:
     
     for filename, content in files.items():
         try:
+            # Normalize Python file indentation
+            if filename.endswith('.py'):
+                try:
+                    content = normalize_python_indentation(content)
+                    logger.debug(f"Normalized indentation for {filename}")
+                except Exception as e:
+                    logger.warning(f"Failed to normalize indentation for {filename}: {e}")
+            
             # Handle subdirectories in filename
             file_path = output_dir / filename
             
@@ -371,19 +575,27 @@ def generate_website(
     # Initialize LLM with higher limits for website generation
     # Note: Many models have context limits (e.g., 16385 tokens total)
     # We need to leave room for input tokens, so use a conservative output limit
-    # For gpt-3.5-turbo and similar models, use 12000 to leave room for input
-    # For Claude models, they typically support higher output limits
+    # Determine appropriate max_tokens based on model capabilities
     try:
         # Determine appropriate max_tokens based on model
         model_lower = (model_name or "").lower()
-        if "claude" in model_lower or "anthropic" in model_lower:
-            # Claude models can handle higher output limits
-            max_output_tokens = 14000
+        
+        # Model-specific token limits (output tokens, leaving room for input)
+        if "claude-3-5" in model_lower or "claude-3-opus" in model_lower:
+            # Claude 3.5 and Opus have higher limits (200k context)
+            max_output_tokens = 16000
+        elif "claude-3" in model_lower or "anthropic" in model_lower:
+            # Claude 3 Sonnet/Haiku have 200k context but be conservative
+            max_output_tokens = 15000
+        elif "gpt-4" in model_lower:
+            # GPT-4 models typically have 8k-32k context
+            max_output_tokens = 12000
+        elif "gpt-3.5" in model_lower:
+            # GPT-3.5-turbo has 16k context limit
+            max_output_tokens = 12000
         else:
-            # For GPT models and others, be more conservative
-            # Leave room for input (typically 1000-2000 tokens for prompts)
-            # Most models have ~16k context, so use 14000 to be safe
-            max_output_tokens = 14000
+            # Default: conservative limit for unknown models
+            max_output_tokens = 12000
         
         llm, actual_model_name = initialize_llm(
             provider=provider,
