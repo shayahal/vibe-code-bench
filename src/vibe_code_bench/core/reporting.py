@@ -522,34 +522,54 @@ class ConsolidatedReportGenerator(ReportGenerator):
         md.append("")
 
         if website_builder_eval:
-            md.append("### Website Builder Evaluation")
+            md.append("### Website Builder Quality Evaluation")
             md.append("")
             metrics = website_builder_eval.get('metrics', {})
-            md.append(f"- **Overall Security Score:** {metrics.get('overall_security_score', 0):.2%}")
-            md.append(f"- **Vulnerabilities Found:** {metrics.get('vulnerabilities_found', 0)}/{metrics.get('vulnerabilities_total', 0)}")
-            md.append("")
+            criteria_summary = website_builder_eval.get('criteria_summary', {})
 
-            # By severity
-            md.append("#### By Severity")
-            md.append("")
-            by_severity = metrics.get('by_severity', {})
-            for severity in ['Critical', 'High', 'Medium', 'Low']:
-                if severity in by_severity:
-                    sev = by_severity[severity]
-                    md.append(f"**{severity}:** {sev.get('found', 0)}/{sev.get('total', 0)} found")
-            md.append("")
+            # Check if this is the new quality-based evaluation
+            if 'overall_quality_score' in metrics:
+                # New quality-based evaluation
+                md.append(f"- **Overall Quality Score:** {metrics.get('overall_quality_score', 0):.2%}")
+                md.append(f"- **Criteria Met:** {criteria_summary.get('met_criteria', 0)}/{criteria_summary.get('total_criteria', 0)}")
+                md.append(f"- **Required Criteria:** {criteria_summary.get('required_met', 0)}/{criteria_summary.get('required_total', 0)}")
+                md.append(f"- **Optional Criteria:** {criteria_summary.get('optional_met', 0)}/{criteria_summary.get('optional_total', 0)}")
+                md.append("")
 
-            # Vulnerabilities found
-            vulnerabilities = website_builder_eval.get('vulnerabilities', [])
-            found_vulns = [v for v in vulnerabilities if v.get('found', False)]
-            if found_vulns:
-                md.append("#### Vulnerabilities Found")
+                # Quality by Category
+                md.append("#### Quality by Category")
                 md.append("")
-                for vuln in found_vulns[:10]:
-                    md.append(f"- **{vuln.get('id')}:** {vuln.get('name')} ({vuln.get('severity')})")
-                if len(found_vulns) > 10:
-                    md.append(f"\n... and {len(found_vulns) - 10} more")
+                category_scores = metrics.get('category_scores', {})
+                for category, score in category_scores.items():
+                    md.append(f"- **{category.replace('_', ' ').title()}:** {score:.2%}")
                 md.append("")
+            else:
+                # Legacy security-based evaluation (for backward compatibility)
+                md.append(f"- **Overall Security Score:** {metrics.get('overall_security_score', 0):.2%}")
+                md.append(f"- **Vulnerabilities Found:** {metrics.get('vulnerabilities_found', 0)}/{metrics.get('vulnerabilities_total', 0)}")
+                md.append("")
+
+                # By severity
+                md.append("#### By Severity")
+                md.append("")
+                by_severity = metrics.get('by_severity', {})
+                for severity in ['Critical', 'High', 'Medium', 'Low']:
+                    if severity in by_severity:
+                        sev = by_severity[severity]
+                        md.append(f"**{severity}:** {sev.get('found', 0)}/{sev.get('total', 0)} found")
+                md.append("")
+
+                # Vulnerabilities found
+                vulnerabilities = website_builder_eval.get('vulnerabilities', [])
+                found_vulns = [v for v in vulnerabilities if v.get('found', False)]
+                if found_vulns:
+                    md.append("#### Vulnerabilities Found")
+                    md.append("")
+                    for vuln in found_vulns[:10]:
+                        md.append(f"- **{vuln.get('id')}:** {vuln.get('name')} ({vuln.get('severity')})")
+                    if len(found_vulns) > 10:
+                        md.append(f"\n... and {len(found_vulns) - 10} more")
+                    md.append("")
 
         if red_team_eval:
             md.append("### Red Team Agent Evaluation")
