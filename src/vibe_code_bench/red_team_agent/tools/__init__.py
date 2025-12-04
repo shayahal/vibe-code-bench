@@ -43,6 +43,7 @@ from .xss_test_tool import test_xss_patterns, get_xss_test_tool
 from .sqli_test_tool import test_sql_injection_patterns, get_sqli_test_tool
 from .auth_analysis_tool import analyze_authentication, get_auth_analysis_tool
 from .security_report_tool import generate_security_report, get_security_report_tool
+from .test_all_pages_tool import test_all_pages, get_test_all_pages_tool
 
 # Tools Registry
 # Maps tool names to their StructuredTool factory functions
@@ -54,6 +55,7 @@ TOOLS_REGISTRY: Dict[str, Callable[[], StructuredTool]] = {
     "test_sql_injection_patterns": get_sqli_test_tool,
     "analyze_authentication": get_auth_analysis_tool,
     "generate_security_report": get_security_report_tool,
+    "test_all_pages": get_test_all_pages_tool,
 }
 
 # List of all available tool names
@@ -111,5 +113,7 @@ __all__ = [
     "get_auth_analysis_tool",
     "generate_security_report",
     "get_security_report_tool",
+    "test_all_pages",
+    "get_test_all_pages_tool",
 ]
 
