@@ -17,8 +17,16 @@ The orchestrator automates the complete evaluation workflow:
 
 ### Basic Usage
 
+After installing the package (`pip install -e .`), you can run:
+
 ```bash
-python orchestrator.py
+orchestrator
+```
+
+Or using Python module:
+
+```bash
+python -m vibe_code_bench.orchestrator.main
 ```
 
 This will:
@@ -30,8 +38,8 @@ This will:
 ### Advanced Usage
 
 ```bash
-python orchestrator.py \
-    --ground-truth red_team_agent/eval/ground_truth_vulnerabilities.json \
+orchestrator \
+    --ground-truth src/vibe_code_bench/red_team_agent/eval/ground_truth_vulnerabilities.json \
     --output-dir runs/orchestrator \
     --website-model "anthropic/claude-3-haiku" \
     --red-team-model "openai/gpt-4" \
@@ -41,7 +49,7 @@ python orchestrator.py \
 
 ### Arguments
 
-- `--ground-truth`: Path to ground truth vulnerabilities JSON (default: `red_team_agent/eval/ground_truth_vulnerabilities.json`)
+- `--ground-truth`: Path to ground truth vulnerabilities JSON (default: `src/vibe_code_bench/red_team_agent/eval/ground_truth_vulnerabilities.json`)
 - `--output-dir`: Directory for output files (default: `runs/orchestrator`)
 - `--website-model`: Model for website builder (default: `anthropic/claude-3-haiku`)
 - `--red-team-model`: Model for red team agent (default: `anthropic/claude-3-haiku`)
@@ -200,11 +208,12 @@ Final Report: runs/orchestrator/run_20251203_133000/final_report.json
 You can also use the orchestrator programmatically:
 
 ```python
-from orchestrator import Orchestrator
+from vibe_code_bench.orchestrator import Orchestrator
 from pathlib import Path
 
 orchestrator = Orchestrator(
-    ground_truth_path="red_team_agent/eval/ground_truth_vulnerabilities.json",
+    website_builder_ground_truth_path="src/vibe_code_bench/red_team_agent/eval/ground_truth_vulnerabilities.json",
+    red_team_ground_truth_path="src/vibe_code_bench/red_team_agent/eval/ground_truth_vulnerabilities.json",
     output_dir=Path("runs/orchestrator"),
     website_builder_model="anthropic/claude-3-haiku",
     red_team_model="openai/gpt-4"

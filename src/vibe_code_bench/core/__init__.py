@@ -13,6 +13,7 @@ from .paths import (
     get_logs_dir,
     get_resources_dir,
     get_absolute_path,
+    get_daily_reports_dir,
 )
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     'get_logs_dir',
     'get_resources_dir',
     'get_absolute_path',
+    'get_daily_reports_dir',
 ]
 

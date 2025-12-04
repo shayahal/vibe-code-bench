@@ -34,7 +34,20 @@ class OrchestratorState(TypedDict):
     # Red team results
     red_team_result: Optional[Dict[str, Any]]
     
-    # Evaluation results
+    # Evaluation results (separate for each component)
+    website_builder_eval_results: Optional[Dict[str, Any]]
+    red_team_eval_results: Optional[Dict[str, Any]]
+    final_eval_results: Optional[Dict[str, Any]]
+    
+    # Report paths
+    website_builder_eval_report_json: Optional[Path]
+    website_builder_eval_report_md: Optional[Path]
+    red_team_eval_report_json: Optional[Path]
+    red_team_eval_report_md: Optional[Path]
+    final_report_json: Optional[Path]
+    final_report_md: Optional[Path]
+    
+    # Legacy field (for backward compatibility)
     eval_results: Optional[Dict[str, Any]]
     
     # Final report
@@ -47,4 +60,6 @@ class OrchestratorState(TypedDict):
     output_dir: Optional[Path]
     website_builder_model: Optional[str]
     red_team_model: Optional[str]
+    website_builder_ground_truth_path: Optional[str]
+    red_team_ground_truth_path: Optional[str]
 

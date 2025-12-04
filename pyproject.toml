@@ -61,7 +61,7 @@ dev = [
 [project.scripts]
 red-team-agent = "vibe_code_bench.red_team_agent.red_team_agent:main"
 website-generator = "vibe_code_bench.website_generator.main:main"
-orchestrator = "vibe_code_bench.orchestrator:main"
+orchestrator = "vibe_code_bench.orchestrator.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

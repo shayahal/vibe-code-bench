@@ -4,23 +4,11 @@ Server Manager Node
 Manages the Flask server lifecycle (start/stop).
 """
 
-import importlib.util
-import sys
-from pathlib import Path
-
 from vibe_code_bench.orchestrator.state import OrchestratorState
-from vibe_code_bench.core.paths import get_repo_root
+from vibe_code_bench.core.server_manager import WebsiteServer
 from vibe_code_bench.core.logging_setup import get_logger
 
 logger = get_logger(__name__)
-
-# Import WebsiteServer from the main orchestrator module
-# We need to import it this way to avoid circular imports
-orchestrator_file = get_repo_root() / "orchestrator.py"
-spec = importlib.util.spec_from_file_location("orchestrator_main", orchestrator_file)
-orchestrator_main = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(orchestrator_main)
-WebsiteServer = orchestrator_main.WebsiteServer
 
 
 def server_manager_node(state: OrchestratorState) -> OrchestratorState:

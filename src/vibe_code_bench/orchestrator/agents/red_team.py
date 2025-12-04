@@ -1,8 +1,10 @@
 """
 Red Team Agent Node
 
-Runs the red team agent to perform security testing on a website.
+Runs the red team agent to perform security testing on a website (evaluation happens separately).
 """
+
+from pathlib import Path
 
 from vibe_code_bench.orchestrator.state import OrchestratorState
 from vibe_code_bench.core.logging_setup import get_logger
@@ -10,7 +12,6 @@ from vibe_code_bench.red_team_agent.agent_common import (
     initialize_langfuse,
     initialize_llm,
     create_and_run_agent,
-    flush_langfuse,
     save_report
 )
 from vibe_code_bench.red_team_agent.tools import get_all_tools
@@ -92,8 +93,15 @@ def red_team_node(state: OrchestratorState) -> OrchestratorState:
         model_name=red_team_model
     )
     
-    # Save reports (both markdown and JSON)
-    md_file, json_file = save_report(report, red_team_run_id, structured_report=structured_report)
+    # Save reports to daily directory (organized by date)
+    from vibe_code_bench.core.paths import get_daily_reports_dir
+    daily_reports_dir = get_daily_reports_dir(run_id)
+    md_file, json_file = save_report(
+        report, 
+        red_team_run_id, 
+        report_dir_path=str(daily_reports_dir),
+        structured_report=structured_report
+    )
     
     logger.info("Red team assessment completed")
     logger.info(f"Execution time: {execution_time:.2f}s")
@@ -101,7 +109,7 @@ def red_team_node(state: OrchestratorState) -> OrchestratorState:
     if json_file:
         logger.info(f"Structured JSON report saved: {json_file}")
     
-    # Update state
+    # Update state with red team result
     red_team_result = {
         'output': output,
         'report': report,
@@ -112,6 +120,7 @@ def red_team_node(state: OrchestratorState) -> OrchestratorState:
         'trace_id': trace_id
     }
     
+    # Return updated state (evaluation will happen later)
     return {
         **state,
         'red_team_result': red_team_result,

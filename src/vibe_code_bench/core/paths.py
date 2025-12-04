@@ -6,7 +6,7 @@ All paths are absolute from the repository root, enabling execution from any loc
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 
 def get_repo_root() -> Path:
@@ -117,6 +117,180 @@ def get_resources_dir() -> Path:
     resources_dir = get_data_dir() / "resources"
     resources_dir.mkdir(exist_ok=True)
     return resources_dir
+
+
+def get_daily_reports_dir(run_id: Optional[str] = None) -> Path:
+    """
+    Get the daily reports directory for orchestrator runs.
+
+    Organizes reports by date: runs/orchestrator/YYYYMMDD/
+
+    DEPRECATED: Use get_run_dir() instead for new structure.
+
+    Args:
+        run_id: Optional run ID (format: YYYYMMDD_HHMMSS). If provided, extracts date from it.
+                If None, uses current date.
+
+    Returns:
+        Path to daily reports directory (created if doesn't exist)
+    """
+    repo_root = get_repo_root()
+
+    if run_id:
+        # Extract date from run_id (format: YYYYMMDD_HHMMSS)
+        # Take first 8 characters for date
+        if len(run_id) >= 8:
+            date_str = run_id[:8]
+        else:
+            # Fallback to current date if run_id format is unexpected
+            from datetime import datetime
+            date_str = datetime.now().strftime("%Y%m%d")
+    else:
+        # Use current date
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y%m%d")
+
+    daily_dir = repo_root / "runs" / "orchestrator" / date_str
+    daily_dir.mkdir(parents=True, exist_ok=True)
+    return daily_dir
+
+
+def get_run_dir(
+    run_id: str,
+    website_builder_model: Optional[str] = None,
+    red_team_model: Optional[str] = None,
+    create: bool = True
+) -> Path:
+    """
+    Get the run directory for a specific orchestrator run.
+
+    New structure: runs/orchestrator/YYYYMMDD/HHMMSS_{wb_model}_{rt_model}/
+
+    Args:
+        run_id: Run ID (format: YYYYMMDD_HHMMSS)
+        website_builder_model: Website builder model name (e.g., "claude-3-haiku")
+        red_team_model: Red team model name (e.g., "claude-3-haiku")
+        create: Whether to create the directory if it doesn't exist
+
+    Returns:
+        Path to run directory
+    """
+    repo_root = get_repo_root()
+
+    # Extract date and time from run_id
+    if len(run_id) >= 8:
+        date_str = run_id[:8]  # YYYYMMDD
+        time_str = run_id[9:] if len(run_id) > 9 else run_id  # HHMMSS or full
+    else:
+        from datetime import datetime
+        now = datetime.now()
+        date_str = now.strftime("%Y%m%d")
+        time_str = run_id
+
+    # Extract time portion (HHMMSS)
+    if '_' in time_str:
+        time_str = time_str.split('_')[0]
+
+    # Build directory name with model info
+    dir_name_parts = [time_str]
+
+    if website_builder_model:
+        # Extract short model name (e.g., "claude-3-haiku" -> "haiku")
+        wb_short = _extract_short_model_name(website_builder_model)
+        dir_name_parts.append(wb_short)
+
+    if red_team_model:
+        rt_short = _extract_short_model_name(red_team_model)
+        dir_name_parts.append(rt_short)
+
+    dir_name = "_".join(dir_name_parts)
+
+    # Create path: runs/orchestrator/YYYYMMDD/HHMMSS_model_model/
+    run_dir = repo_root / "runs" / "orchestrator" / date_str / dir_name
+
+    if create:
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+    return run_dir
+
+
+def _extract_short_model_name(model: str) -> str:
+    """
+    Extract short model name from full model identifier.
+
+    Examples:
+        "anthropic/claude-3-haiku" -> "haiku"
+        "claude-3-5-sonnet" -> "sonnet"
+        "gpt-4" -> "gpt4"
+
+    Args:
+        model: Full model identifier
+
+    Returns:
+        Short model name
+    """
+    # Remove provider prefix
+    if '/' in model:
+        model = model.split('/')[-1]
+
+    # Extract key part
+    if 'haiku' in model.lower():
+        return 'haiku'
+    elif 'sonnet' in model.lower():
+        return 'sonnet'
+    elif 'opus' in model.lower():
+        return 'opus'
+    elif 'gpt-4' in model.lower():
+        return 'gpt4'
+    elif 'gpt-3' in model.lower():
+        return 'gpt3'
+    else:
+        # Fallback: use last part
+        parts = model.replace('-', '_').split('_')
+        return parts[-1] if parts else model
+
+
+def create_run_structure(
+    run_id: str,
+    website_builder_model: Optional[str] = None,
+    red_team_model: Optional[str] = None
+) -> Dict[str, Path]:
+    """
+    Create complete directory structure for a run.
+
+    Structure:
+        YYYYMMDD/HHMMSS_{wb_model}_{rt_model}/
+            ├── run.json
+            ├── report.md
+            ├── website/
+            ├── red_team_report.md
+            └── logs/
+
+    Args:
+        run_id: Run ID (format: YYYYMMDD_HHMMSS)
+        website_builder_model: Website builder model name
+        red_team_model: Red team model name
+
+    Returns:
+        Dictionary with paths to all key directories and files
+    """
+    run_dir = get_run_dir(run_id, website_builder_model, red_team_model, create=True)
+
+    # Create subdirectories
+    website_dir = run_dir / "website"
+    website_dir.mkdir(exist_ok=True)
+
+    logs_dir = run_dir / "logs"
+    logs_dir.mkdir(exist_ok=True)
+
+    return {
+        'run_dir': run_dir,
+        'website_dir': website_dir,
+        'logs_dir': logs_dir,
+        'run_json': run_dir / "run.json",
+        'report_md': run_dir / "report.md",
+        'red_team_report_md': run_dir / "red_team_report.md"
+    }
 
 
 def get_absolute_path(path: str | Path, base: Optional[Path] = None) -> Path:

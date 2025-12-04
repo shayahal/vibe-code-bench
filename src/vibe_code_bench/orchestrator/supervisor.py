@@ -92,12 +92,22 @@ def supervisor_node(state: OrchestratorState) -> OrchestratorState:
     }
 
 
-def route_supervisor(state: OrchestratorState) -> Literal["website_builder", "server_manager", "red_team_agent", "evaluator", "__end__"]:
+def route_supervisor(state: OrchestratorState) -> Literal["website_builder", "server_manager", "red_team_agent", "website_builder_evaluator", "red_team_evaluator", "evaluator", "__end__"]:
     """
     Route to the next agent based on state.
     
     This function implements deterministic routing logic based on the workflow state.
     It checks what has been completed and routes to the next step.
+    
+    Workflow:
+    1. website_builder (builds website)
+    2. server_manager (starts server)
+    3. red_team_agent (tests website)
+    4. server_manager (stops server)
+    5. website_builder_evaluator (evaluates website builder - if ground truth provided)
+    6. red_team_evaluator (evaluates red team findings - if ground truth provided)
+    7. evaluator (generates final comprehensive report)
+    8. __end__ (complete)
     
     Args:
         state: Current orchestrator state
@@ -123,9 +133,19 @@ def route_supervisor(state: OrchestratorState) -> Literal["website_builder", "se
         # Server is still running, need to stop it
         return "server_manager"
     
-    # Check if evaluation is done
-    if state.get("red_team_result") and not state.get("eval_results"):
-        return "evaluator"
+    # After server is stopped, run evaluations sequentially
+    if state.get("red_team_result") and state.get("url") and not state.get("server"):
+        # Server stopped, check if we need to evaluate website builder first
+        if state.get("website_builder_ground_truth_path") and not state.get("website_builder_eval_results"):
+            return "website_builder_evaluator"
+        # Then check if we need to evaluate red team
+        if state.get("red_team_ground_truth_path") and not state.get("red_team_eval_results"):
+            return "red_team_evaluator"
+        # Both evaluations done (or skipped), generate final report
+        if not state.get("final_report"):
+            return "evaluator"
+        # Final report generated, we're done
+        return "__end__"
     
     # Everything is complete
     return "__end__"

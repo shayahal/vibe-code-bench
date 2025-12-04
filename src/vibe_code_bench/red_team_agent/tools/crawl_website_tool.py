@@ -255,7 +255,9 @@ class WebsiteCrawler:
                         if not already_queued:
                             self.to_visit.append((normalized_link, current_depth + 1))
             
-            time.sleep(self.delay)  # Rate limiting
+            # Minimal rate limiting - reduced delay for faster crawling
+            if self.delay > 0:
+                time.sleep(min(self.delay, 0.1))  # Cap at 100ms for speed
             return page_info
             
         except requests.exceptions.RequestException as e:

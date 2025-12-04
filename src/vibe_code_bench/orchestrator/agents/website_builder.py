@@ -1,20 +1,15 @@
 """
 Website Builder Agent Node
 
-Builds a website using the website builder agent.
+Builds a website using the website builder agent (evaluation happens separately).
 """
 
-import os
-import time
-from datetime import datetime
 from pathlib import Path
-from langchain_core.messages import HumanMessage, SystemMessage
 
 from vibe_code_bench.orchestrator.state import OrchestratorState
-from vibe_code_bench.core.llm_setup import initialize_llm
 from vibe_code_bench.core.logging_setup import get_logger
-from vibe_code_bench.website_generator.prompts import SYSTEM_PROMPT, USER_PROMPT
-from vibe_code_bench.website_generator.main import parse_json_response, write_files, ensure_main_py
+from vibe_code_bench.website_generator.main import generate_website
+from vibe_code_bench.website_generator.prompts import USER_PROMPT
 
 logger = get_logger(__name__)
 
@@ -43,75 +38,38 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
         raise ValueError("output_dir not set in state")
     
     # Create run directory
-    run_id = state.get("run_id") or datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = state.get("run_id")
+    if not run_id:
+        from datetime import datetime
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
     run_dir = output_dir / f"run_{run_id}"
     website_dir = run_dir / "website"
     website_dir.mkdir(parents=True, exist_ok=True)
     logger.debug(f"Created website directory: {website_dir}")
     
-    # Use main.py's approach: SYSTEM_PROMPT + USER_PROMPT
-    system_prompt = SYSTEM_PROMPT
-    user_prompt = prompt
-    
-    # Initialize LLM
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        logger.error("OPENROUTER_API_KEY not found")
-        raise Exception("OPENROUTER_API_KEY not found")
-    
+    # Use main.py's generate_website function directly
     website_builder_model = state.get("website_builder_model", "anthropic/claude-3-haiku")
     
-    llm, model_name = initialize_llm(
-        provider="openrouter",
+    logger.info(f"Generating website with model: {website_builder_model}")
+    build_result_dict = generate_website(
+        user_prompt=prompt,
+        output_dir=website_dir,
         model_name=website_builder_model,
-        temperature=0.7,
-        api_key=api_key
+        provider="openrouter",
+        skip_langfuse=False  # Use LangFuse for tracking
     )
     
-    # Increase max_tokens for website generation
-    if hasattr(llm, 'max_tokens'):
-        llm.max_tokens = 8000
-        logger.debug(f"Set max_tokens to {llm.max_tokens}")
-    
-    logger.info(f"Using model: {model_name}")
-    
-    # Invoke LLM
-    logger.info("Generating website code")
-    start_time = time.time()
-    response = llm.invoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt)
-    ])
-    
-    # Extract content
-    if hasattr(response, 'content'):
-        response_text = response.content
-    else:
-        response_text = str(response)
-    
-    execution_time = time.time() - start_time
-    logger.info(f"Generated {len(response_text)} characters in {execution_time:.2f}s")
-    logger.debug(f"Response preview: {response_text[:200]}...")
-    
-    # Parse JSON response using main.py's robust parser
-    logger.info("Parsing JSON response")
-    # Use main.py's parse_json_response function which handles markdown code blocks, etc.
-    files = parse_json_response(response_text)
-    logger.info(f"Parsed {len(files)} files")
-    
-    # Ensure main.py exists
-    files = ensure_main_py(files)
-    
-    # Write files using main.py's function
-    logger.info("Writing files")
-    created_files = write_files(files, website_dir)
+    if build_result_dict.get("status") != "success":
+        error_msg = build_result_dict.get("error", "Unknown error")
+        logger.error(f"Website build failed: {error_msg}")
+        raise Exception(f"Website build failed: {error_msg}")
     
     logger.info("Website built successfully")
-    logger.info(f"Execution time: {execution_time:.2f}s")
     logger.info(f"Output directory: {website_dir}")
-    logger.info(f"Files created: {len(created_files)}")
+    logger.info(f"Files created: {build_result_dict.get('total_files', 0)}")
     
-    # Update state
+    # Build result structure for state
     build_result = {
         'run_id': run_id,
         'run_dir': run_dir,
@@ -119,13 +77,13 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
         'result': {
             'status': 'success',
             'output_directory': str(website_dir),
-            'created_files': created_files,
-            'total_files': len(created_files),
-            'execution_time': execution_time
+            'created_files': build_result_dict.get('created_files', []),
+            'total_files': build_result_dict.get('total_files', 0),
+            'execution_time': build_result_dict.get('execution_time', 0)
         }
     }
     
-    # Return updated state
+    # Return updated state (evaluation will happen later)
     return {
         **state,
         'run_id': run_id,

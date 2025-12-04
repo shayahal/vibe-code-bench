@@ -46,16 +46,61 @@ class WebsiteServer:
         
         Args:
             website_dir: Directory containing website files (including main.py)
-            port: Port to run server on
+            port: Port to run server on (will try next port if in use)
         """
         self.website_dir = Path(website_dir)
         self.port = port
         self.process = None
         self.url = f"http://localhost:{port}"
     
+    @staticmethod
+    def is_port_available(port: int) -> bool:
+        """
+        Check if a port is available.
+        
+        Args:
+            port: Port number to check
+            
+        Returns:
+            True if port is available, False otherwise
+        """
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('localhost', port))
+                return True
+            except OSError:
+                return False
+    
+    def find_available_port(self, start_port: int = None, max_attempts: int = 100) -> int:
+        """
+        Find an available port starting from the given port.
+        
+        Args:
+            start_port: Starting port number (defaults to self.port)
+            max_attempts: Maximum number of ports to try
+            
+        Returns:
+            Available port number
+            
+        Raises:
+            RuntimeError: If no available port found
+        """
+        if start_port is None:
+            start_port = self.port
+        
+        for i in range(max_attempts):
+            port = start_port + i
+            if self.is_port_available(port):
+                return port
+        
+        raise RuntimeError(f"Could not find an available port starting from {start_port}")
+    
     def start(self, timeout: int = 60) -> bool:
         """
         Start the Flask server.
+        
+        If the requested port is in use, automatically tries the next available port.
         
         Args:
             timeout: Maximum time to wait for server to start
@@ -67,6 +112,18 @@ class WebsiteServer:
         if not main_py.exists():
             print(f"Error: main.py not found in {self.website_dir}")
             return False
+        
+        # Check if requested port is available, find next available if not
+        original_port = self.port
+        if not self.is_port_available(self.port):
+            print(f"Port {self.port} is in use, finding next available port...")
+            try:
+                self.port = self.find_available_port()
+                self.url = f"http://localhost:{self.port}"
+                print(f"Using port {self.port} instead of {original_port}")
+            except RuntimeError as e:
+                print(f"Error: Could not find an available port: {e}")
+                return False
         
         # Change to website directory and start Flask
         env = os.environ.copy()
@@ -96,6 +153,17 @@ class WebsiteServer:
                     error_output = (stderr or stdout or b"").decode('utf-8', errors='ignore')
                     if error_output:
                         print(f"Server process exited. Error output:\n{error_output[:500]}")
+                        # Check if it's a port binding error and try next port
+                        if "Address already in use" in error_output or "port" in error_output.lower():
+                            print(f"Port {self.port} binding failed, trying next port...")
+                            try:
+                                self.port = self.find_available_port(start_port=self.port + 1)
+                                self.url = f"http://localhost:{self.port}"
+                                print(f"Retrying with port {self.port}")
+                                # Retry starting the server
+                                return self.start(timeout=timeout)
+                            except RuntimeError:
+                                return False
                     return False
                 
                 try:

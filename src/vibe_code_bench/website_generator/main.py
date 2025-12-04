@@ -46,9 +46,7 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-# Import LangFuse (required) - LangChain integration
-from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
-from langfuse import Langfuse
+# LangFuse imports are handled via agent_common when needed
 
 
 def create_unique_folder(base_dir: Path) -> Path:
@@ -84,13 +82,20 @@ def normalize_python_indentation(content: str) -> str:
     # Patterns that should be at module level (0 indentation)
     module_level_patterns = [
         r'^@app\.route\(',
+        r'^@\w+\.route\(',
         r'^from\s+',
         r'^import\s+',
         r'^app\s*=\s*Flask\(',
         r'^if\s+__name__',
+        r'^def\s+\w+\(',  # Function definitions should be at module level after decorators
     ]
     
     import re
+    
+    # Track if we're inside a function definition
+    in_function = False
+    function_indent_level = 0
+    in_name_main_block = False  # Track if we're inside if __name__ == '__main__' block
     
     for i, line in enumerate(lines):
         # Convert tabs to 4 spaces
@@ -103,14 +108,27 @@ def normalize_python_indentation(content: str) -> str:
         
         leading_spaces = len(line) - len(stripped)
         
-        # Check if this line should be at module level
-        should_be_module_level = any(re.search(pattern, stripped) for pattern in module_level_patterns)
+        # Check if we're entering or exiting an if __name__ block
+        if re.match(r'^if\s+__name__', stripped):
+            in_name_main_block = True
+        elif in_name_main_block and leading_spaces == 0 and not stripped.startswith('#'):
+            # We've exited the if __name__ block
+            in_name_main_block = False
         
-        # Also check for function definitions that should be at module level
-        # (not inside a class or other block)
-        if re.match(r'^def\s+\w+\(', stripped) and leading_spaces > 0:
-            # Check if we're inside a data structure (list/dict) by looking backwards
-            # If previous non-empty line ends with ] or ), this def is incorrectly indented
+        # Check if this line should be at module level
+        # But don't treat imports as module-level if we're inside an if __name__ block
+        should_be_module_level = False
+        if not (in_name_main_block and (stripped.startswith('import ') or stripped.startswith('from '))):
+            should_be_module_level = any(re.search(pattern, stripped) for pattern in module_level_patterns)
+        
+        # Check if this is a decorator
+        is_decorator = stripped.startswith('@')
+        
+        # Check if this is a function definition
+        is_function_def = bool(re.match(r'^def\s+\w+\(', stripped))
+        
+        # Check if previous line is a decorator - if so, function should be at module level
+        if is_function_def and leading_spaces > 0:
             prev_idx = i - 1
             while prev_idx >= 0 and not lines[prev_idx].strip():
                 prev_idx -= 1
@@ -118,9 +136,42 @@ def normalize_python_indentation(content: str) -> str:
             if prev_idx >= 0:
                 prev_line = lines[prev_idx].replace('\t', '    ')
                 prev_stripped = prev_line.lstrip()
-                # If previous line ends a data structure, this def should be at module level
-                if prev_stripped.endswith(']') or (prev_stripped.endswith(')') and ',' in prev_stripped):
+                # If previous line is a decorator, this def should be at module level
+                if prev_stripped.startswith('@'):
                     should_be_module_level = True
+                    in_function = True
+                    function_indent_level = 4  # Function body should be indented 4 spaces
+                # If previous line ends a data structure, this def should be at module level
+                elif prev_stripped.endswith(']') or (prev_stripped.endswith(')') and ',' in prev_stripped):
+                    should_be_module_level = True
+            # Also check if the previous non-empty line before that is a decorator
+            if not should_be_module_level and prev_idx > 0:
+                prev_prev_idx = prev_idx - 1
+                while prev_prev_idx >= 0 and not lines[prev_prev_idx].strip():
+                    prev_prev_idx -= 1
+                if prev_prev_idx >= 0:
+                    prev_prev_stripped = lines[prev_prev_idx].replace('\t', '    ').lstrip()
+                    if prev_prev_stripped.startswith('@'):
+                        should_be_module_level = True
+                        in_function = True
+                        function_indent_level = 4
+        
+        # If we're inside a function and this line is indented, normalize to function body indent
+        if in_function and leading_spaces > 0 and not is_decorator and not is_function_def:
+            # This is a function body line - should be indented 4 spaces
+            if leading_spaces != 4:
+                normalized.append('    ' + stripped)
+            else:
+                normalized.append(line)
+            continue
+        
+        # Reset function tracking if we hit a module-level statement
+        if should_be_module_level and is_function_def:
+            in_function = True
+            function_indent_level = 4
+        elif should_be_module_level and not is_decorator and not is_function_def:
+            in_function = False
+            function_indent_level = 0
         
         # Fix incorrect indentation
         if should_be_module_level and leading_spaces > 0:
@@ -191,10 +242,10 @@ def ensure_main_py(files: dict) -> dict:
             if "if __name__ == '__main__':" in main_py_content:
                 main_py_content = main_py_content.replace(
                     "if __name__ == '__main__':",
-                    "if __name__ == '__main__':\n    app.run(debug=True, host='0.0.0.0', port=5000)"
+                    "if __name__ == '__main__':\n    import os\n    port = int(os.environ.get('FLASK_PORT', 5000))\n    app.run(debug=True, host='0.0.0.0', port=port)"
                 )
             else:
-                main_py_content += "\n\nif __name__ == '__main__':\n    app.run(debug=True, host='0.0.0.0', port=5000)\n"
+                main_py_content += "\n\nif __name__ == '__main__':\n    import os\n    port = int(os.environ.get('FLASK_PORT', 5000))\n    app.run(debug=True, host='0.0.0.0', port=port)\n"
     
     # Create proper Flask app if needed
     if not main_py_content or "Flask" not in main_py_content:
@@ -231,7 +282,9 @@ def script():
     return send_file('script.js', mimetype='application/javascript')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import os
+    port = int(os.environ.get('FLASK_PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
 """
     
     files["main.py"] = main_py_content
@@ -525,22 +578,19 @@ def generate_website(
     langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
     
     if not skip_langfuse:
-        langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-        langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
-        
-        if langfuse_secret_key and langfuse_public_key:
-            try:
-                langfuse_client = Langfuse(
-                    secret_key=langfuse_secret_key,
-                    public_key=langfuse_public_key,
-                    host=langfuse_host
-                )
-                langfuse_handler = LangfuseCallbackHandler()
-                logger.debug(f"LangFuse initialized (host: {langfuse_host})")
-            except Exception as e:
-                logger.warning(f"Failed to initialize LangFuse: {e}")
-                langfuse_client = None
-                langfuse_handler = None
+        try:
+            from vibe_code_bench.red_team_agent.agent_common import initialize_langfuse
+            langfuse_client, langfuse_handler = initialize_langfuse()
+            logger.debug(f"LangFuse initialized (host: {langfuse_host})")
+        except SystemExit:
+            # initialize_langfuse exits if credentials are missing
+            logger.warning("LangFuse credentials not found, continuing without LangFuse")
+            langfuse_client = None
+            langfuse_handler = None
+        except Exception as e:
+            logger.warning(f"Failed to initialize LangFuse: {e}")
+            langfuse_client = None
+            langfuse_handler = None
     
     # Determine API key based on provider
     if provider == "openrouter":
@@ -745,30 +795,19 @@ def main():
     # Initialize LangFuse (required) - following LangChain integration pattern
     # See: https://langfuse.com/docs/observability/get-started
     # The CallbackHandler reads credentials from environment variables automatically
-    langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-    langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
     langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
     
-    if not langfuse_secret_key or not langfuse_public_key:
+    try:
+        from vibe_code_bench.red_team_agent.agent_common import initialize_langfuse
+        langfuse_client, langfuse_handler = initialize_langfuse()
+        logger.info(f"LangFuse initialized (host: {langfuse_host})")
+        logger.info("  Using LangChain integration - all traces will be automatically captured")
+    except SystemExit:
+        # initialize_langfuse exits if credentials are missing
         logger.error("Error: LangFuse credentials not found.")
         logger.error("  Please set LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY in your .env file.")
         logger.error("  You can get these from https://cloud.langfuse.com")
         sys.exit(1)
-    
-    try:
-        # Initialize LangFuse client for fetching trace data
-        langfuse_client = Langfuse(
-            secret_key=langfuse_secret_key,
-            public_key=langfuse_public_key,
-            host=langfuse_host
-        )
-        
-        # Initialize LangFuse CallbackHandler for LangChain
-        # It automatically reads LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, and LANGFUSE_HOST from env
-        # This automatically captures all LLM calls, tool calls, and agent actions
-        langfuse_handler = LangfuseCallbackHandler()
-        logger.info(f"LangFuse initialized (host: {langfuse_host})")
-        logger.info("  Using LangChain integration - all traces will be automatically captured")
     except Exception as e:
         logger.error(f"Error initializing LangFuse: {e}")
         logger.error("  Make sure LANGFUSE_SECRET_KEY and LANGFUSE_PUBLIC_KEY are set in your .env file")
@@ -907,10 +946,8 @@ def main():
     else:
         logger.warning(f"\nWARNING: main.py not found (this shouldn't happen)")
     
-    # Wait a moment for LangFuse to process the trace
-    time.sleep(2)
+    # Flush LangFuse data (async, no need to wait)
     langfuse_client.flush()  # Ensure data is sent
-    time.sleep(1)  # Give it a moment to process
     
     logger.info("=" * 60)
     logger.info(f"All observability data logged to LangFuse")

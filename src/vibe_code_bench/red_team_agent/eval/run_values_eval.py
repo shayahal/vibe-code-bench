@@ -13,11 +13,9 @@ import sys
 import argparse
 from pathlib import Path
 
-# Add parent directories to path for imports
+# Import paths utility
 from vibe_code_bench.core.paths import get_repo_root, get_absolute_path
 project_root = get_repo_root()
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 from red_team_agent.eval.values_eval_framework import evaluate_red_team_agent_values
 

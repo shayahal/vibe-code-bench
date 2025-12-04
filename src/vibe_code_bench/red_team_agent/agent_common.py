@@ -72,7 +72,7 @@ def initialize_llm(
     title: str = "Red Team Agent"
 ) -> ChatOpenAI:
     """
-    Initialize LLM via OpenRouter.
+    Initialize LLM via OpenRouter with LangFuse integration.
     
     Args:
         model_name: Model name to use
@@ -86,24 +86,44 @@ def initialize_llm(
     Raises:
         SystemExit: If API key is missing or initialization fails
     """
+    from vibe_code_bench.core.llm_setup import initialize_llm as core_initialize_llm
+    
     api_key = api_key or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         logger.error("OPENROUTER_API_KEY not found. Set it as env var or use --api-key")
         sys.exit(1)
     
     try:
-        llm = ChatOpenAI(
-            model=model_name,
-            api_key=api_key,
+        # Use core LLM setup function
+        llm, _ = core_initialize_llm(
+            provider="openrouter",
+            model_name=model_name,
             temperature=0.7,
+            api_key=api_key,
             max_tokens=2000,
-            base_url="https://openrouter.ai/api/v1",
-            default_headers={
+            timeout=60
+        )
+        
+        # Note: Callbacks are passed in invoke() calls via config parameter,
+        # not set on the LLM object. The langfuse_handler is passed to create_and_run_agent
+        # which includes it in the agent.invoke() config.
+        
+        # Set custom headers if supported (for OpenRouter)
+        if hasattr(llm, 'default_headers'):
+            current_headers = getattr(llm, 'default_headers', {}) or {}
+            llm.default_headers = {
+                **current_headers,
                 "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
                 "X-Title": title
-            },
-            callbacks=[langfuse_handler]
-        )
+            }
+        elif hasattr(llm, 'extra_headers'):
+            current_headers = getattr(llm, 'extra_headers', {}) or {}
+            llm.extra_headers = {
+                **current_headers,
+                "HTTP-Referer": "https://github.com/shayahal/vibe-code-bench",
+                "X-Title": title
+            }
+        
         return llm
     except Exception as e:
         logger.error(f"Error initializing LLM: {e}")
@@ -258,8 +278,6 @@ def flush_langfuse(
         langfuse_client: LangFuse client
         trace_id: Optional trace ID to verify
     """
-    time.sleep(2)
-    
     flush_success = False
     try:
         if hasattr(langfuse_handler, 'langfuse') and langfuse_handler.langfuse:
@@ -275,7 +293,6 @@ def flush_langfuse(
         logger.warning(f"Error flushing LangFuse client: {e}")
     
     if flush_success:
-        time.sleep(5)
         logger.debug("LangFuse data flushed successfully")
     else:
         logger.warning("LangFuse flush may have failed - trace might not be available immediately")
