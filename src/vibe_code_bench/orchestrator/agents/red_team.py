@@ -93,15 +93,36 @@ def red_team_node(state: OrchestratorState) -> OrchestratorState:
         model_name=red_team_model
     )
     
-    # Save reports to daily directory (organized by date)
-    from vibe_code_bench.core.paths import get_daily_reports_dir
-    daily_reports_dir = get_daily_reports_dir(run_id)
-    md_file, json_file = save_report(
-        report, 
-        red_team_run_id, 
-        report_dir_path=str(daily_reports_dir),
-        structured_report=structured_report
-    )
+    # Save reports to run directory
+    run_dir = state.get("run_dir")
+    red_team_report_md = state.get("red_team_report_file")
+
+    # Save the red team report to the designated file
+    if run_dir and red_team_report_md:
+        # Save markdown report to red_team_report.md
+        with open(red_team_report_md, 'w', encoding='utf-8') as f:
+            f.write(report)
+        md_file = red_team_report_md
+        logger.info(f"Red team report saved: {md_file}")
+
+        # Also save structured JSON if available
+        if structured_report:
+            import json
+            json_file = run_dir / f"red_team_structured_{run_id}.json"
+            with open(json_file, 'w', encoding='utf-8') as f:
+                json.dump(structured_report, f, indent=2, ensure_ascii=False)
+        else:
+            json_file = None
+    else:
+        # Fallback to daily directory for backward compatibility
+        from vibe_code_bench.core.paths import get_daily_reports_dir
+        daily_reports_dir = get_daily_reports_dir(run_id)
+        md_file, json_file = save_report(
+            report,
+            red_team_run_id,
+            report_dir_path=str(daily_reports_dir),
+            structured_report=structured_report
+        )
     
     logger.info("Red team assessment completed")
     logger.info(f"Execution time: {execution_time:.2f}s")

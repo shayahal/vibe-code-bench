@@ -30,23 +30,16 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     
     # Get prompt from state or use default
     prompt = state.get("prompt") or USER_PROMPT
-    
-    # Get output directory from state (should be set by orchestrator)
-    output_dir = state.get("output_dir")
-    if not output_dir:
-        logger.error("output_dir not set in state")
-        raise ValueError("output_dir not set in state")
-    
-    # Create run directory
+
+    # Get directories from state (created by orchestrator main)
     run_id = state.get("run_id")
-    if not run_id:
-        from datetime import datetime
-        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    run_dir = output_dir / f"run_{run_id}"
-    website_dir = run_dir / "website"
-    website_dir.mkdir(parents=True, exist_ok=True)
-    logger.debug(f"Created website directory: {website_dir}")
+    website_dir = state.get("website_dir")
+
+    if not run_id or not website_dir:
+        logger.error("run_id or website_dir not set in state")
+        raise ValueError("run_id or website_dir not set in state")
+
+    logger.debug(f"Using website directory: {website_dir}")
     
     # Use main.py's generate_website function directly
     website_builder_model = state.get("website_builder_model", "anthropic/claude-3-haiku")
@@ -72,7 +65,6 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
     # Build result structure for state
     build_result = {
         'run_id': run_id,
-        'run_dir': run_dir,
         'website_dir': website_dir,
         'result': {
             'status': 'success',
@@ -82,12 +74,10 @@ def website_builder_node(state: OrchestratorState) -> OrchestratorState:
             'execution_time': build_result_dict.get('execution_time', 0)
         }
     }
-    
+
     # Return updated state (evaluation will happen later)
     return {
         **state,
-        'run_id': run_id,
-        'website_dir': website_dir,
         'build_result': build_result,
         'next': 'server_manager'  # Next step is to start the server
     }
