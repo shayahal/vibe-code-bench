@@ -39,6 +39,126 @@
 - Use claude-3-haiku for mini agent
 - Include metadata in agent invocations
 
+## Path Management - CRITICAL
+
+### ⚠️ ALWAYS USE ABSOLUTE PATHS FROM REPO ROOT
+
+**NEVER use relative paths or `Path(__file__).parent` for file operations.**
+
+All file operations must use the paths utility module:
+
+```python
+from vibe_code_bench.core.paths import (
+    get_repo_root,
+    get_runs_dir,
+    get_reports_dir,
+    get_logs_dir,
+    get_cache_dir,
+    get_resources_dir,
+    get_absolute_path,
+)
+```
+
+### Standard Directory Structure
+
+All output goes to `data/` at repo root:
+- `data/runs/` - All run directories (organized by subdirectory and timestamp)
+- `data/reports/` - All reports
+- `data/logs/` - All logs
+- `data/cache/` - Cache files (LLM cache, etc.)
+- `data/resources/` - Resources and static files
+
+### Examples
+
+**✅ CORRECT:**
+```python
+from vibe_code_bench.core.paths import get_runs_dir, get_reports_dir, get_absolute_path
+from vibe_code_bench.core.run_directory import setup_run_directory
+
+# Create run directory
+run_dir = setup_run_directory(subdir="website_generator")  # Creates data/runs/website_generator/run_TIMESTAMP
+
+# Save report
+from vibe_code_bench.red_team_agent.agent_common import save_report
+report_file = save_report(report, run_id)  # Saves to data/reports/
+
+# Resolve any path to absolute
+config_path = get_absolute_path("config.json")  # Resolves from repo root
+```
+
+**❌ WRONG:**
+```python
+# DON'T use relative paths
+run_dir = Path("runs/website_generator")
+report_dir = Path("reports")
+output = Path("../output")
+
+# DON'T use __file__ for file operations
+config_path = Path(__file__).parent / "config.json"
+base_dir = Path(__file__).parent.parent / "data"
+
+# DON'T use sys.path manipulation
+sys.path.insert(0, str(Path(__file__).parent.parent))
+```
+
+## Package Structure
+
+- All code is under `src/vibe_code_bench/`
+- Package is installed in editable mode: `pip install -e .`
+- All imports use absolute paths: `from vibe_code_bench.module import something`
+- **NO** `sys.path.insert()` or path manipulation needed
+
+## Imports
+
+- **NO try/except blocks for imports** - if a dependency is missing, let it fail with ImportError
+- All imports are absolute: `from vibe_code_bench.core.llm_setup import initialize_llm`
+- Never use relative imports like `from ..core import something`
+
+## File Operations
+
+1. **Run directories**: Use `setup_run_directory(subdir="name")` from `vibe_code_bench.core.run_directory`
+2. **Reports**: Use `save_report()` from `vibe_code_bench.red_team_agent.agent_common` (saves to `data/reports/`)
+3. **Logs**: Automatically saved to `run_dir / "logs"` via `setup_file_logging()`
+4. **Cache**: LLM cache goes to `data/cache/llm/` automatically
+5. **Any other files**: Use `get_absolute_path()` to resolve paths from repo root
+
+## Running from Any Location
+
+The codebase is designed to work when run from any directory:
+- All paths are absolute from repo root
+- No reliance on current working directory
+- Package is properly installed, so imports work from anywhere
+
+## When Adding New File Operations
+
+1. **Ask yourself**: "Where should this file go?"
+   - Run-specific? → `run_dir / "subdir" / "filename"`
+   - Report? → Use `save_report()` or `get_reports_dir()`
+   - Log? → `run_dir / "logs" / "filename"`
+   - Cache? → `get_cache_dir() / "subdir" / "filename"`
+   - Resource? → `get_resources_dir() / "filename"`
+
+2. **Always use absolute paths**:
+   ```python
+   from vibe_code_bench.core.paths import get_absolute_path, get_reports_dir
+   
+   # For user-provided paths
+   user_path = get_absolute_path(user_input)
+   
+   # For standard locations
+   report_path = get_reports_dir() / "report.json"
+   ```
+
+3. **Never assume current directory**:
+   ```python
+   # ❌ WRONG
+   output_file = Path("output.json")
+   
+   # ✅ CORRECT
+   from vibe_code_bench.core.paths import get_reports_dir
+   output_file = get_reports_dir() / "output.json"
+   ```
+
 ## Before Completing Tasks
 
 - ✅ All tests pass 
@@ -46,3 +166,6 @@
 - ✅ User approval obtained before running agent
 - ✅ Error handling in place
 - ✅ No linting errors
+- ✅ All paths use absolute paths from repo root
+- ✅ No relative paths or `Path(__file__).parent` for file operations
+- ✅ No `sys.path.insert()` statements

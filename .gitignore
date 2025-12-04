@@ -44,10 +44,17 @@ Thumbs.db
 # Logs
 *.log
 
-# Run directories (logs and reports organized by timestamp)
-runs/
+# Data directory (runs, reports, logs, cache, resources)
+# All output goes to data/ at repo root
+data/
 
 # Test coverage
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Legacy directories (if any remain)
+runs/
+reports/
+.llm_cache/
+llm_cache/

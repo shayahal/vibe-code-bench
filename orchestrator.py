@@ -27,13 +27,14 @@ import requests
 from dotenv import load_dotenv
 
 # Add project root to path
-project_root = Path(__file__).parent
+from vibe_code_bench.core.paths import get_repo_root
+project_root = get_repo_root()
 sys.path.insert(0, str(project_root))
 
 load_dotenv()
 
 # Import evaluation framework
-from red_team_agent.eval.eval_framework import VulnerabilityEvaluator
+from vibe_code_bench.red_team_agent.eval.eval_framework import VulnerabilityEvaluator
 
 
 class WebsiteServer:
@@ -188,12 +189,12 @@ class Orchestrator:
         from langgraph.graph import StateGraph, END
         
         # Import orchestrator components
-        from orchestrator.state import OrchestratorState
-        from orchestrator.supervisor import supervisor_node
-        from orchestrator.agents.website_builder import website_builder_node
-        from orchestrator.agents.red_team import red_team_node
-        from orchestrator.agents.server_manager import server_manager_node
-        from orchestrator.agents.evaluator import evaluator_node
+        from vibe_code_bench.orchestrator.state import OrchestratorState
+        from vibe_code_bench.orchestrator.supervisor import supervisor_node
+        from vibe_code_bench.orchestrator.agents.website_builder import website_builder_node
+        from vibe_code_bench.orchestrator.agents.red_team import red_team_node
+        from vibe_code_bench.orchestrator.agents.server_manager import server_manager_node
+        from vibe_code_bench.orchestrator.agents.evaluator import evaluator_node
         
         # Create state graph
         workflow = StateGraph(OrchestratorState)
@@ -247,9 +248,9 @@ class Orchestrator:
         """
         # Use main.py's approach instead of the agent
         from langchain_core.messages import HumanMessage, SystemMessage
-        from core.llm_setup import initialize_llm
-        from website_generator.prompts import SYSTEM_PROMPT, USER_PROMPT
-        from website_generator.main import parse_json_response, write_files, ensure_main_py
+        from vibe_code_bench.core.llm_setup import initialize_llm
+        from vibe_code_bench.website_generator.prompts import SYSTEM_PROMPT, USER_PROMPT
+        from vibe_code_bench.website_generator.main import parse_json_response, write_files, ensure_main_py
         import time
         
         print("\n" + "="*60)
@@ -401,16 +402,16 @@ class Orchestrator:
         print("="*60)
         
         # Import red team agent components
-        from red_team_agent.agent_common import (
+        from vibe_code_bench.red_team_agent.agent_common import (
             initialize_langfuse,
             initialize_llm,
             create_and_run_agent,
             flush_langfuse,
             save_report
         )
-        from red_team_agent.tools import get_all_tools
-        from red_team_agent.report_generator import generate_run_report
-        from red_team_agent.red_team_prompt import RED_TEAM_AGENT_PROMPT
+        from vibe_code_bench.red_team_agent.tools import get_all_tools
+        from vibe_code_bench.red_team_agent.report_generator import generate_run_report
+        from vibe_code_bench.red_team_agent.red_team_prompt import RED_TEAM_AGENT_PROMPT
         
         # Initialize LangFuse
         langfuse_client, langfuse_handler = initialize_langfuse()
@@ -760,7 +761,7 @@ class Orchestrator:
         print("="*70)
         
         # Initialize state
-        from website_generator.prompts import USER_PROMPT
+        from vibe_code_bench.website_generator.prompts import USER_PROMPT
         from langchain_core.messages import HumanMessage
         
         initial_state = {
@@ -868,13 +869,13 @@ def main():
     parser.add_argument(
         "--ground-truth",
         type=str,
-        default="red_team_agent/eval/ground_truth_vulnerabilities.json",
+        default=None,
         help="Path to ground truth vulnerabilities JSON"
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="runs/orchestrator",
+        default=None,
         help="Output directory for runs"
     )
     parser.add_argument(
@@ -903,8 +904,9 @@ def main():
     
     args = parser.parse_args()
     
-    # Validate ground truth path
-    ground_truth_path = Path(args.ground_truth)
+    # Validate ground truth path (resolve to absolute)
+    from vibe_code_bench.core.paths import get_absolute_path
+    ground_truth_path = get_absolute_path(args.ground_truth)
     if not ground_truth_path.exists():
         print(f"Error: Ground truth file not found: {ground_truth_path}")
         sys.exit(1)
@@ -912,7 +914,7 @@ def main():
     # Run orchestrator
     orchestrator = Orchestrator(
         ground_truth_path=str(ground_truth_path),
-        output_dir=Path(args.output_dir),
+        output_dir=args.output_dir,
         website_builder_model=args.website_model,
         red_team_model=args.red_team_model
     )
