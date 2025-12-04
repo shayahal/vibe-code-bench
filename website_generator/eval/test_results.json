@@ -1,0 +1,424 @@
+{
+  "builder_name": "SimpleWebsiteCreatorAgent",
+  "evaluation_date": "2025-12-03T13:20:56.337362",
+  "builder_analysis": {
+    "module": "website_generator.agent",
+    "class": null,
+    "analysis": {
+      "class_name": "SimpleWebsiteCreatorAgent",
+      "methods": [],
+      "security_related_methods": [],
+      "code_patterns": {
+        "has_sanitization": false,
+        "has_validation": false,
+        "has_security_headers": false,
+        "has_csrf_protection": false,
+        "has_input_escaping": true,
+        "uses_innerhtml": false,
+        "uses_eval": false,
+        "uses_dangerous_patterns": []
+      },
+      "imports": [
+        "os",
+        "logging",
+        "json",
+        "re",
+        "sys"
+      ],
+      "docstrings": {}
+    }
+  },
+  "security_analysis": {
+    "files_analyzed": 9,
+    "vulnerabilities_found": [
+      {
+        "type": "Security Headers",
+        "severity": "Critical",
+        "file": "index.html",
+        "description": "Missing Content-Security-Policy header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "High",
+        "file": "index.html",
+        "description": "Missing X-Frame-Options header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "Critical",
+        "file": "about.html",
+        "description": "Missing Content-Security-Policy header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "High",
+        "file": "about.html",
+        "description": "Missing X-Frame-Options header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "Critical",
+        "file": "contact.html",
+        "description": "Missing Content-Security-Policy header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "High",
+        "file": "contact.html",
+        "description": "Missing X-Frame-Options header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "Critical",
+        "file": "menu.html",
+        "description": "Missing Content-Security-Policy header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "High",
+        "file": "menu.html",
+        "description": "Missing X-Frame-Options header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "Critical",
+        "file": "login.html",
+        "description": "Missing Content-Security-Policy header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "High",
+        "file": "login.html",
+        "description": "Missing X-Frame-Options header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "Critical",
+        "file": "checkout.html",
+        "description": "Missing Content-Security-Policy header"
+      },
+      {
+        "type": "Security Headers",
+        "severity": "High",
+        "file": "checkout.html",
+        "description": "Missing X-Frame-Options header"
+      }
+    ],
+    "security_issues": [],
+    "matched_vulnerabilities": [
+      {
+        "id": "VULN-001",
+        "name": "Missing Content-Security-Policy Header",
+        "found": true,
+        "severity": "Critical"
+      },
+      {
+        "id": "VULN-002",
+        "name": "Missing X-Frame-Options Header",
+        "found": true,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-003",
+        "name": "Missing X-Content-Type-Options Header",
+        "found": true,
+        "severity": "Medium"
+      },
+      {
+        "id": "VULN-004",
+        "name": "Missing Strict-Transport-Security Header",
+        "found": true,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-005",
+        "name": "Missing X-XSS-Protection Header",
+        "found": true,
+        "severity": "Low"
+      },
+      {
+        "id": "VULN-006",
+        "name": "Missing Referrer-Policy Header",
+        "found": true,
+        "severity": "Low"
+      },
+      {
+        "id": "VULN-007",
+        "name": "Reflected XSS Vulnerability",
+        "found": false,
+        "severity": "Critical"
+      },
+      {
+        "id": "VULN-008",
+        "name": "Stored XSS Vulnerability",
+        "found": false,
+        "severity": "Critical"
+      },
+      {
+        "id": "VULN-009",
+        "name": "DOM-based XSS Vulnerability",
+        "found": false,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-010",
+        "name": "SQL Injection Vulnerability",
+        "found": false,
+        "severity": "Critical"
+      },
+      {
+        "id": "VULN-011",
+        "name": "No CSRF Protection",
+        "found": false,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-012",
+        "name": "Weak Authentication Mechanism",
+        "found": true,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-013",
+        "name": "Session Fixation Vulnerability",
+        "found": false,
+        "severity": "Medium"
+      },
+      {
+        "id": "VULN-014",
+        "name": "Insecure Password Storage",
+        "found": true,
+        "severity": "Critical"
+      },
+      {
+        "id": "VULN-015",
+        "name": "Missing HTTPS Enforcement",
+        "found": false,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-016",
+        "name": "Insecure Cookie Configuration",
+        "found": false,
+        "severity": "Medium"
+      },
+      {
+        "id": "VULN-017",
+        "name": "Information Disclosure",
+        "found": false,
+        "severity": "Medium"
+      },
+      {
+        "id": "VULN-018",
+        "name": "Directory Traversal Vulnerability",
+        "found": false,
+        "severity": "High"
+      },
+      {
+        "id": "VULN-019",
+        "name": "Insecure Direct Object Reference",
+        "found": false,
+        "severity": "Medium"
+      },
+      {
+        "id": "VULN-020",
+        "name": "Server Information Disclosure",
+        "found": true,
+        "severity": "Low"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "id": "VULN-001",
+      "name": "Missing Content-Security-Policy Header",
+      "description": "Website lacks Content-Security-Policy header, weakening XSS protection",
+      "severity": "Critical",
+      "type": "Security Headers",
+      "found": true
+    },
+    {
+      "id": "VULN-002",
+      "name": "Missing X-Frame-Options Header",
+      "description": "Website lacks X-Frame-Options header, susceptible to clickjacking attacks",
+      "severity": "High",
+      "type": "Security Headers",
+      "found": true
+    },
+    {
+      "id": "VULN-003",
+      "name": "Missing X-Content-Type-Options Header",
+      "description": "Website lacks X-Content-Type-Options header, no MIME type sniffing protection",
+      "severity": "Medium",
+      "type": "Security Headers",
+      "found": true
+    },
+    {
+      "id": "VULN-004",
+      "name": "Missing Strict-Transport-Security Header",
+      "description": "Website lacks HSTS header, no forced HTTPS",
+      "severity": "High",
+      "type": "Security Headers",
+      "found": true
+    },
+    {
+      "id": "VULN-005",
+      "name": "Missing X-XSS-Protection Header",
+      "description": "Website lacks X-XSS-Protection header (deprecated but still used)",
+      "severity": "Low",
+      "type": "Security Headers",
+      "found": true
+    },
+    {
+      "id": "VULN-006",
+      "name": "Missing Referrer-Policy Header",
+      "description": "Website lacks Referrer-Policy header, possible referrer information leakage",
+      "severity": "Low",
+      "type": "Security Headers",
+      "found": true
+    },
+    {
+      "id": "VULN-007",
+      "name": "Reflected XSS Vulnerability",
+      "description": "Cross-Site Scripting vulnerability where user input is reflected without sanitization",
+      "severity": "Critical",
+      "type": "XSS",
+      "found": false
+    },
+    {
+      "id": "VULN-008",
+      "name": "Stored XSS Vulnerability",
+      "description": "Stored Cross-Site Scripting vulnerability in user-generated content",
+      "severity": "Critical",
+      "type": "XSS",
+      "found": false
+    },
+    {
+      "id": "VULN-009",
+      "name": "DOM-based XSS Vulnerability",
+      "description": "DOM-based Cross-Site Scripting vulnerability in client-side code",
+      "severity": "High",
+      "type": "XSS",
+      "found": false
+    },
+    {
+      "id": "VULN-010",
+      "name": "SQL Injection Vulnerability",
+      "description": "SQL injection vulnerability allowing database manipulation",
+      "severity": "Critical",
+      "type": "SQL Injection",
+      "found": false
+    },
+    {
+      "id": "VULN-011",
+      "name": "No CSRF Protection",
+      "description": "Forms lack CSRF tokens, vulnerable to Cross-Site Request Forgery",
+      "severity": "High",
+      "type": "CSRF",
+      "found": false
+    },
+    {
+      "id": "VULN-012",
+      "name": "Weak Authentication Mechanism",
+      "description": "Authentication mechanism has security weaknesses",
+      "severity": "High",
+      "type": "Authentication",
+      "found": true
+    },
+    {
+      "id": "VULN-013",
+      "name": "Session Fixation Vulnerability",
+      "description": "Session IDs not regenerated after login, vulnerable to session fixation",
+      "severity": "Medium",
+      "type": "Session Management",
+      "found": false
+    },
+    {
+      "id": "VULN-014",
+      "name": "Insecure Password Storage",
+      "description": "Passwords stored in plaintext or with weak hashing",
+      "severity": "Critical",
+      "type": "Authentication",
+      "found": true
+    },
+    {
+      "id": "VULN-015",
+      "name": "Missing HTTPS Enforcement",
+      "description": "Website allows HTTP connections without redirecting to HTTPS",
+      "severity": "High",
+      "type": "Transport Security",
+      "found": false
+    },
+    {
+      "id": "VULN-016",
+      "name": "Insecure Cookie Configuration",
+      "description": "Cookies lack Secure or HttpOnly flags",
+      "severity": "Medium",
+      "type": "Cookie Security",
+      "found": false
+    },
+    {
+      "id": "VULN-017",
+      "name": "Information Disclosure",
+      "description": "Website exposes sensitive information (error messages, stack traces, etc.)",
+      "severity": "Medium",
+      "type": "Information Disclosure",
+      "found": false
+    },
+    {
+      "id": "VULN-018",
+      "name": "Directory Traversal Vulnerability",
+      "description": "Application vulnerable to directory traversal attacks",
+      "severity": "High",
+      "type": "Path Traversal",
+      "found": false
+    },
+    {
+      "id": "VULN-019",
+      "name": "Insecure Direct Object Reference",
+      "description": "Application allows direct access to objects without authorization checks",
+      "severity": "Medium",
+      "type": "Authorization",
+      "found": false
+    },
+    {
+      "id": "VULN-020",
+      "name": "Server Information Disclosure",
+      "description": "Server headers expose version information or server details",
+      "severity": "Low",
+      "type": "Information Disclosure",
+      "found": true
+    }
+  ],
+  "metrics": {
+    "overall_security_score": 0.55,
+    "vulnerabilities_found": 9,
+    "vulnerabilities_total": 20,
+    "by_severity": {
+      "Critical": {
+        "total": 5,
+        "found": 2,
+        "not_found": 3,
+        "detection_rate": 0.4
+      },
+      "High": {
+        "total": 7,
+        "found": 3,
+        "not_found": 4,
+        "detection_rate": 0.42857142857142855
+      },
+      "Medium": {
+        "total": 5,
+        "found": 1,
+        "not_found": 4,
+        "detection_rate": 0.2
+      },
+      "Low": {
+        "total": 3,
+        "found": 3,
+        "not_found": 0,
+        "detection_rate": 1.0
+      }
+    }
+  }
+}

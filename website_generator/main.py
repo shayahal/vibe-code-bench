@@ -737,7 +737,7 @@ REMINDER: Respond with ONLY valid JSON starting with {{ and ending with }}. No m
 def main():
     """Main execution flow (CLI entry point)."""
     # Create run directory with unique timestamp ID
-    run_dir = setup_run_directory(base_dir="runs")
+    run_dir = setup_run_directory(base_dir="runs/website_generator")
     run_id = run_dir.name
     logger.info("=" * 60)
     logger.info(f"Starting Website Generator Run: {run_id}")
