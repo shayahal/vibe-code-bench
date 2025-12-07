@@ -70,6 +70,7 @@ class Orchestrator:
         from vibe_code_bench.orchestrator.state import OrchestratorState
         from vibe_code_bench.orchestrator.supervisor import supervisor_node
         from vibe_code_bench.orchestrator.agents.website_builder import website_builder_node
+        from vibe_code_bench.orchestrator.agents.static_analysis import static_analysis_node
         from vibe_code_bench.orchestrator.agents.red_team import red_team_node
         from vibe_code_bench.orchestrator.agents.server_manager import server_manager_node
         from vibe_code_bench.orchestrator.agents.website_builder_evaluator import website_builder_evaluator_node
@@ -82,6 +83,7 @@ class Orchestrator:
         # Add nodes
         workflow.add_node("supervisor", supervisor_node)
         workflow.add_node("website_builder", website_builder_node)
+        workflow.add_node("static_analysis", static_analysis_node)
         workflow.add_node("server_manager", server_manager_node)
         workflow.add_node("red_team_agent", red_team_node)
         workflow.add_node("website_builder_evaluator", website_builder_evaluator_node)
@@ -97,6 +99,7 @@ class Orchestrator:
             lambda state: state.get("next", "website_builder"),
             {
                 "website_builder": "website_builder",
+                "static_analysis": "static_analysis",
                 "server_manager": "server_manager",
                 "red_team_agent": "red_team_agent",
                 "website_builder_evaluator": "website_builder_evaluator",
@@ -108,6 +111,7 @@ class Orchestrator:
         
         # Add edges from nodes back to supervisor
         workflow.add_edge("website_builder", "supervisor")
+        workflow.add_edge("static_analysis", "supervisor")
         workflow.add_edge("server_manager", "supervisor")
         workflow.add_edge("red_team_agent", "supervisor")
         workflow.add_edge("website_builder_evaluator", "supervisor")
@@ -162,6 +166,7 @@ class Orchestrator:
             "build_result": None,
             "url": None,
             "server": None,
+            "static_analysis_result": None,
             "red_team_result": None,
             "website_builder_eval_results": None,
             "red_team_eval_results": None,

@@ -393,7 +393,9 @@ class ConsolidatedReportGenerator(ReportGenerator):
         build_result: Optional[Dict[str, Any]],
         red_team_result: Optional[Dict[str, Any]],
         website_builder_eval: Optional[Dict[str, Any]],
-        red_team_eval: Optional[Dict[str, Any]]
+        red_team_eval: Optional[Dict[str, Any]],
+        static_analysis_result: Optional[Dict[str, Any]] = None,
+        merged_vulnerabilities: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Generate consolidated run.json with all data.
@@ -434,7 +436,12 @@ class ConsolidatedReportGenerator(ReportGenerator):
                     'execution_time_seconds': round(red_team_result.get('execution_time', 0), 2) if red_team_result else 0,
                     'report_file': str(red_team_result.get('report_file', '')) if red_team_result else '',
                     'trace_id': red_team_result.get('trace_id') if red_team_result else None
-                } if red_team_result else None
+                } if red_team_result else None,
+                'static_analysis': {
+                    'summary': static_analysis_result.get('summary', {}) if static_analysis_result else {},
+                    'tools': static_analysis_result.get('tools', []) if static_analysis_result else [],
+                    'vulnerabilities': static_analysis_result.get('vulnerabilities', []) if static_analysis_result else []
+                } if static_analysis_result else None
             },
             'evaluation': {
                 'website_builder': {
@@ -446,7 +453,8 @@ class ConsolidatedReportGenerator(ReportGenerator):
                 'red_team': {
                     'metrics': red_team_eval.get('metrics', {}) if red_team_eval else {},
                     'vulnerabilities': red_team_eval.get('vulnerabilities', []) if red_team_eval else []
-                } if red_team_eval else None
+                } if red_team_eval else None,
+                'merged_vulnerabilities': merged_vulnerabilities if merged_vulnerabilities else None
             }
         }
 
@@ -460,7 +468,9 @@ class ConsolidatedReportGenerator(ReportGenerator):
         build_result: Optional[Dict[str, Any]],
         red_team_result: Optional[Dict[str, Any]],
         website_builder_eval: Optional[Dict[str, Any]],
-        red_team_eval: Optional[Dict[str, Any]]
+        red_team_eval: Optional[Dict[str, Any]],
+        static_analysis_result: Optional[Dict[str, Any]] = None,
+        merged_vulnerabilities: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Generate consolidated Markdown report.
@@ -507,6 +517,17 @@ class ConsolidatedReportGenerator(ReportGenerator):
             md.append(f"- **Status:** {build_result.get('result', {}).get('status', 'unknown')}")
             md.append(f"- **Files Created:** {build_result.get('result', {}).get('total_files', 0)}")
             md.append(f"- **Output Directory:** `{build_result.get('website_dir', '')}`")
+            md.append("")
+
+        if static_analysis_result:
+            md.append("### Static Analysis")
+            summary = static_analysis_result.get('summary', {})
+            md.append(f"- **Total Vulnerabilities:** {summary.get('total_vulnerabilities', 0)}")
+            by_severity = summary.get('by_severity', {})
+            md.append(f"- **Critical:** {by_severity.get('Critical', 0)}, **High:** {by_severity.get('High', 0)}, **Medium:** {by_severity.get('Medium', 0)}, **Low:** {by_severity.get('Low', 0)}")
+            by_tool = summary.get('by_tool', {})
+            if by_tool:
+                md.append(f"- **By Tool:** {', '.join([f'{tool}={count}' for tool, count in by_tool.items()])}")
             md.append("")
 
         if red_team_result:
@@ -603,6 +624,49 @@ class ConsolidatedReportGenerator(ReportGenerator):
                 if len(found_vulns) > 10:
                     md.append(f"\n... and {len(found_vulns) - 10} more")
                 md.append("")
+
+        # Merged Vulnerabilities Section
+        if merged_vulnerabilities:
+            md.append("## Unified Vulnerability Report")
+            md.append("")
+            summary = merged_vulnerabilities.get('summary', {})
+            md.append(f"- **Total Vulnerabilities:** {summary.get('total', 0)}")
+            md.append("")
+            
+            # By Severity
+            md.append("### By Severity")
+            md.append("")
+            by_severity = summary.get('by_severity', {})
+            for severity in ['Critical', 'High', 'Medium', 'Low']:
+                count = by_severity.get(severity, 0)
+                if count > 0:
+                    md.append(f"- **{severity}:** {count}")
+            md.append("")
+            
+            # By Source
+            md.append("### By Source")
+            md.append("")
+            by_source = summary.get('by_source', {})
+            for source, count in by_source.items():
+                md.append(f"- **{source.replace('_', ' ').title()}:** {count}")
+            md.append("")
+            
+            # Top vulnerabilities by severity
+            by_severity_vulns = merged_vulnerabilities.get('by_severity', {})
+            for severity in ['Critical', 'High']:
+                vulns = by_severity_vulns.get(severity, [])
+                if vulns:
+                    md.append(f"#### {severity} Severity Examples")
+                    md.append("")
+                    for vuln in vulns[:5]:  # Show top 5
+                        md.append(f"- **{vuln.get('id', 'Unknown')}:** {vuln.get('name', 'Unknown')[:80]}")
+                        md.append(f"  - Source: {vuln.get('source', 'unknown').replace('_', ' ').title()}, Type: {vuln.get('type', 'Unknown')}")
+                    if len(vulns) > 5:
+                        md.append(f"\n... and {len(vulns) - 5} more {severity} vulnerabilities")
+                    md.append("")
+            
+            md.append("> See `evals/merged_vulnerabilities.md` for complete detailed report")
+            md.append("")
 
         # Footer
         md.append("---")

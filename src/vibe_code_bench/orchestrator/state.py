@@ -39,6 +39,9 @@ class OrchestratorState(TypedDict):
     red_team_result: Optional[Dict[str, Any]]
     red_team_report_file: Optional[Path]  # Original red team markdown report
 
+    # Static analysis results
+    static_analysis_result: Optional[Dict[str, Any]]
+
     # Evaluation results (separate for each component)
     website_builder_eval_results: Optional[Dict[str, Any]]
     red_team_eval_results: Optional[Dict[str, Any]]

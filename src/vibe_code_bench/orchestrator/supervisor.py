@@ -23,17 +23,19 @@ Available agents:
 2. **server_manager**: Manages the Flask server lifecycle (start/stop). Use when:
    - website_dir exists but url is None (need to start server)
    - url exists but need to stop server (after red team testing)
-3. **red_team_agent**: Performs security testing on a website. Use when url exists and red_team_result is None.
-4. **evaluator**: Evaluates red team findings against ground truth. Use when red_team_result exists but eval_results is None.
-5. **__end__**: End the workflow when evaluation is complete (eval_results exists).
+3. **static_analysis**: Performs static code analysis on website files. Use when website_dir exists and static_analysis_result is None.
+4. **red_team_agent**: Performs security testing on a website. Use when url exists and red_team_result is None.
+5. **evaluator**: Evaluates red team findings against ground truth. Use when red_team_result exists but eval_results is None.
+6. **__end__**: End the workflow when evaluation is complete (eval_results exists).
 
 Workflow order:
 1. website_builder (if not built)
-2. server_manager start (if not started)
-3. red_team_agent (if not tested)
-4. server_manager stop (after testing)
-5. evaluator (if not evaluated)
-6. __end__ (when complete)
+2. static_analysis (if not analyzed - can run in parallel with server setup)
+3. server_manager start (if not started)
+4. red_team_agent (if not tested)
+5. server_manager stop (after testing)
+6. evaluator (if not evaluated)
+7. __end__ (when complete)
 
 Based on the current state, determine the next agent to execute.
 Respond with ONLY the agent name: website_builder, server_manager, red_team_agent, evaluator, or __end__
@@ -92,7 +94,7 @@ def supervisor_node(state: OrchestratorState) -> OrchestratorState:
     }
 
 
-def route_supervisor(state: OrchestratorState) -> Literal["website_builder", "server_manager", "red_team_agent", "website_builder_evaluator", "red_team_evaluator", "evaluator", "__end__"]:
+def route_supervisor(state: OrchestratorState) -> Literal["website_builder", "server_manager", "static_analysis", "red_team_agent", "website_builder_evaluator", "red_team_evaluator", "evaluator", "__end__"]:
     """
     Route to the next agent based on state.
     
@@ -118,6 +120,10 @@ def route_supervisor(state: OrchestratorState) -> Literal["website_builder", "se
     # Check if website is built
     if not state.get("website_dir") or not state.get("build_result"):
         return "website_builder"
+    
+    # Check if static analysis needs to be run (can run after website is built, before or after server starts)
+    if state.get("website_dir") and not state.get("static_analysis_result"):
+        return "static_analysis"
     
     # Check if server needs to be started
     if not state.get("url") and state.get("website_dir"):

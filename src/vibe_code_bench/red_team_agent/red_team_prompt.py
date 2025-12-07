@@ -4,7 +4,19 @@ Red Team Agent System Prompt
 This prompt defines the behavior and capabilities of the red team security testing agent.
 """
 
-RED_TEAM_AGENT_PROMPT = """You are a web security testing agent. Test websites for vulnerabilities and document findings.
+from vibe_code_bench.red_team_agent.scenario_guidance import generate_scenario_guidance_text
+
+
+def get_red_team_agent_prompt() -> str:
+    """
+    Get the red team agent system prompt with scenario-based vulnerability guidance.
+    
+    Returns:
+        Complete system prompt string with scenario guidance included
+    """
+    scenario_guidance = generate_scenario_guidance_text()
+    
+    base_prompt = """You are a web security testing agent. Test websites for vulnerabilities and document findings.
 
 CRITICAL: You must perform DEEP, COMPREHENSIVE testing. Do NOT just test the main page!
 
@@ -35,4 +47,14 @@ IMPORTANT:
 - The goal is comprehensive security assessment where EVERY discovered page is tested
 
 Report vulnerabilities by severity: CRITICAL, HIGH, MEDIUM, LOW. Be comprehensive and detailed."""
+    
+    # Combine base prompt with scenario guidance
+    if scenario_guidance:
+        return base_prompt + "\n" + scenario_guidance
+    else:
+        return base_prompt
+
+
+# Backwards compatibility: export prompt as constant (will include scenario guidance)
+RED_TEAM_AGENT_PROMPT = get_red_team_agent_prompt()
 
