@@ -86,7 +86,7 @@ class PageAnalyzer:
 
     def extract_forms(self, html: str) -> List[Dict[str, Any]]:
         """
-        Extract all forms from HTML.
+        Extract all forms from HTML, including JavaScript-rendered forms without <form> tags.
 
         Args:
             html: HTML content
@@ -97,31 +97,197 @@ class PageAnalyzer:
         forms = []
         try:
             soup = BeautifulSoup(html, "lxml")
+            
+            # 1. Extract traditional <form> tags
             for form in soup.find_all("form"):
                 form_info = {
                     "action": form.get("action", ""),
                     "method": form.get("method", "get").lower(),
                     "fields": [],
+                    "is_form_tag": True,
                 }
 
                 # Extract input fields
                 for input_field in form.find_all(["input", "textarea", "select"]):
-                    field_info = {
-                        "name": input_field.get("name", ""),
-                        "type": input_field.get("type", "text"),
-                        "required": input_field.has_attr("required"),
-                    }
-                    if input_field.name == "select":
-                        options = [opt.get("value", "") for opt in input_field.find_all("option")]
-                        field_info["options"] = options
-                    form_info["fields"].append(field_info)
+                    field_info = self._extract_field_info(input_field)
+                    if field_info:
+                        form_info["fields"].append(field_info)
 
-                forms.append(form_info)
+                if form_info["fields"]:  # Only add if it has fields
+                    forms.append(form_info)
+
+            # 2. Detect forms without <form> tags (JavaScript-rendered forms)
+            # Look for common patterns: modals, dialogs, or containers with multiple inputs
+            
+            # Check for modal/dialog elements that might contain forms
+            modal_selectors = [
+                'div[class*="modal"]',
+                'div[class*="dialog"]',
+                'div[class*="popup"]',
+                'div[class*="form"]',
+                'div[role="dialog"]',
+                'div[aria-modal="true"]',
+            ]
+            
+            processed_containers = set()
+            
+            for selector in modal_selectors:
+                try:
+                    containers = soup.select(selector)
+                    for container in containers:
+                        # Skip if we've already processed this container
+                        container_id = id(container)
+                        if container_id in processed_containers:
+                            continue
+                        processed_containers.add(container_id)
+                        
+                        # Find all input fields within this container
+                        inputs = container.find_all(["input", "textarea", "select"])
+                        
+                        # Only consider it a form if it has 2+ input fields
+                        if len(inputs) >= 2:
+                            # Check for submit buttons
+                            submit_buttons = container.find_all(
+                                ["button", "input"],
+                                type=lambda x: x and x.lower() in ["submit", "button"]
+                            )
+                            
+                            # Also check for buttons with submit-like text
+                            all_buttons = container.find_all("button")
+                            has_submit_like_button = any(
+                                btn.get_text().lower().strip() in [
+                                    "submit", "save", "create", "add", "send", 
+                                    "book", "reserve", "confirm", "register"
+                                ] 
+                                for btn in all_buttons
+                            )
+                            
+                            if submit_buttons or has_submit_like_button or len(inputs) >= 3:
+                                form_info = {
+                                    "action": "",  # No action for JS forms
+                                    "method": "post",  # Default assumption
+                                    "fields": [],
+                                    "is_form_tag": False,
+                                    "container_type": selector,
+                                }
+                                
+                                for input_field in inputs:
+                                    field_info = self._extract_field_info(input_field)
+                                    if field_info:
+                                        form_info["fields"].append(field_info)
+                                
+                                if form_info["fields"]:
+                                    forms.append(form_info)
+                except Exception as e:
+                    logger.debug(f"Error processing selector {selector}: {e}")
+                    continue
+            
+            # 3. Detect standalone input groups (forms without containers)
+            # Look for groups of inputs that are siblings or nearby
+            all_inputs = soup.find_all(["input", "textarea", "select"])
+            
+            # Group inputs by their parent containers
+            input_groups = {}
+            for inp in all_inputs:
+                # Find the nearest common parent (skip if already in a form)
+                parent = inp.find_parent("form")
+                if parent:
+                    continue  # Already handled by form tag extraction
+                
+                # Find container (div, section, etc.)
+                container = inp.find_parent(["div", "section", "article", "main"])
+                if container:
+                    container_id = id(container)
+                    if container_id not in input_groups:
+                        input_groups[container_id] = {
+                            "container": container,
+                            "inputs": [],
+                        }
+                    input_groups[container_id]["inputs"].append(inp)
+            
+            # Process input groups
+            for container_id, group in input_groups.items():
+                inputs = group["inputs"]
+                container = group["container"]
+                
+                # Only consider groups with 2+ inputs
+                if len(inputs) >= 2:
+                    # Check if this container was already processed as a modal
+                    if container_id in processed_containers:
+                        continue
+                    
+                    # Check for nearby submit buttons
+                    submit_buttons = container.find_all(
+                        ["button", "input"],
+                        type=lambda x: x and x.lower() in ["submit", "button"]
+                    )
+                    
+                    if submit_buttons or len(inputs) >= 3:
+                        form_info = {
+                            "action": "",
+                            "method": "post",
+                            "fields": [],
+                            "is_form_tag": False,
+                            "container_type": "input_group",
+                        }
+                        
+                        for input_field in inputs:
+                            field_info = self._extract_field_info(input_field)
+                            if field_info:
+                                form_info["fields"].append(field_info)
+                        
+                        if form_info["fields"]:
+                            forms.append(form_info)
 
         except Exception as e:
             logger.error(f"Error extracting forms: {e}")
 
         return forms
+    
+    def _extract_field_info(self, input_field) -> Optional[Dict[str, Any]]:
+        """
+        Extract field information from an input element.
+        
+        Args:
+            input_field: BeautifulSoup element
+            
+        Returns:
+            Dictionary with field info or None if field should be skipped
+        """
+        # Skip hidden inputs and buttons (unless they're submit buttons)
+        field_type = input_field.get("type", "").lower()
+        if field_type in ["hidden", "button"] and input_field.name != "button":
+            return None
+        
+        field_info = {
+            "name": input_field.get("name") or input_field.get("id") or "",
+            "type": field_type or "text",
+            "required": input_field.has_attr("required"),
+            "placeholder": input_field.get("placeholder", ""),
+        }
+        
+        # Get label if available
+        label = None
+        if input_field.get("id"):
+            label_tag = input_field.find_parent().find("label", {"for": input_field.get("id")})
+            if not label_tag:
+                # Try finding label that contains this input
+                label_tag = input_field.find_parent("label")
+            if label_tag:
+                label = label_tag.get_text(strip=True)
+        
+        if label:
+            field_info["label"] = label
+        
+        if input_field.name == "select":
+            options = [opt.get("value", "") for opt in input_field.find_all("option")]
+            field_info["options"] = options
+        
+        if input_field.name == "textarea":
+            field_info["rows"] = input_field.get("rows")
+            field_info["cols"] = input_field.get("cols")
+        
+        return field_info
 
     def classify_page_type(self, html: str, url: str) -> Optional[str]:
         """

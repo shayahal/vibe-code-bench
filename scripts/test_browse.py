@@ -2,6 +2,14 @@
 
 import logging
 import sys
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Add src to path for development
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -12,15 +20,15 @@ try:
     # Initialize agent
     print("Initializing browsing agent...")
     agent = BrowsingAgent(
-        max_pages=50,
-        respect_robots=True,
+        max_pages=10,
+        respect_robots=False,
         enable_javascript=True,
         headless=True
     )
     
     # Discover pages
-    print(f"\nDiscovering pages on https://shayahal.com...")
-    result = agent.discover("https://shayahal.com")
+    print(f"\nDiscovering pages on https://pizza-pal-reservations.lovable.app/...")
+    result = agent.discover("https://pizza-pal-reservations.lovable.app/")
     
     # Print results
     print(f"\n{'='*60}")
@@ -49,13 +57,15 @@ try:
     if len(result.pages) > 20:
         print(f"... and {len(result.pages) - 20} more pages")
     
-    # Save results
-    output_path = agent.save_results(result)
-    print(f"\nResults saved to: {output_path}")
+    # Save results (both comprehensive and summary)
+    report_paths = agent.save_results(result, save_summary=True)
+    print(f"\nComprehensive report saved to: {report_paths['comprehensive']}")
+    print(f"Summary report saved to: {report_paths['summary']}")
     
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Make sure the package is installed: pip install -e .")
+    import traceback
+    traceback.print_exc()
     sys.exit(1)
 except Exception as e:
     print(f"Error: {e}")

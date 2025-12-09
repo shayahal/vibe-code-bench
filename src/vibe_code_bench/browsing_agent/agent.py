@@ -21,6 +21,17 @@ except ImportError:
         create_react_agent = None
         AgentExecutor = None
 
+# Try to import Anchor Browser tools
+try:
+    from langchain_anchorbrowser import (
+        AnchorContentTool,
+        AnchorScreenshotTool,
+        SimpleAnchorWebTaskTool,
+    )
+    ANCHOR_BROWSER_TOOLS_AVAILABLE = True
+except ImportError:
+    ANCHOR_BROWSER_TOOLS_AVAILABLE = False
+
 from vibe_code_bench.browsing_agent.browser import BrowserWrapper
 from vibe_code_bench.browsing_agent.discovery import DiscoveryEngine
 from vibe_code_bench.browsing_agent.analyzer import PageAnalyzer
@@ -142,6 +153,22 @@ def create_browsing_agent_tools(
             description="Authenticate with a login form. Use when a page requires authentication. Requires login_url, username, and password.",
         ),
     ]
+
+    # Add Anchor Browser tools directly if available
+    if ANCHOR_BROWSER_TOOLS_AVAILABLE:
+        try:
+            anchor_content_tool = AnchorContentTool()
+            anchor_screenshot_tool = AnchorScreenshotTool()
+            anchor_web_task_tool = SimpleAnchorWebTaskTool()
+            
+            tools.extend([
+                anchor_content_tool,
+                anchor_screenshot_tool,
+                anchor_web_task_tool,
+            ])
+            logger.info("Added Anchor Browser tools to agent")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Anchor Browser tools: {e}")
 
     return tools
 

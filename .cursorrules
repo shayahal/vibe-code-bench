@@ -27,7 +27,10 @@ All output goes to `data/` at repo root:
 - `data/cache/` - Cache files (LLM cache, etc.)
 - `data/resources/` - Resources and static files
 
-All ac-hod tests and scripts should be stored in /scripts
+All test scripts and utility scripts should be stored in `/scripts` directory:
+- Test scripts (e.g., `test_*.py`, `*_test.py`) → `/scripts`
+- Utility scripts and one-off scripts → `/scripts`
+- When creating new test or utility scripts, always place them in `/scripts`
 
 ### Examples
 
@@ -120,13 +123,21 @@ The codebase is designed to work when run from any directory:
    output_file = get_reports_dir() / "output.json"
    ```
 
+## Test Scripts and Utility Scripts
+
+- **All test scripts** (e.g., `test_*.py`, `*_test.py`) must be placed in `/scripts` directory
+- **All utility scripts** and one-off scripts must be placed in `/scripts` directory
+- When creating test scripts, use the pattern: `/scripts/test_<feature>.py`
+- Scripts in `/scripts` should handle path setup correctly (add `src/` to path if needed)
+
 ## Before Completing Tasks
 
 - ✅ All tests pass 
 - ✅ New code has tests
+- ✅ Test scripts are placed in `/scripts` directory
 - ✅ User approval obtained before running agent
 - ✅ Error handling in place
 - ✅ No linting errors
 - ✅ All paths use absolute paths from repo root
 - ✅ No relative paths or `Path(__file__).parent` for file operations
-- ✅ No `sys.path.insert()` statements
+- ✅ No `sys.path.insert()` statements (except in `/scripts` for path setup)

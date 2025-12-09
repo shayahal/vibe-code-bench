@@ -7,6 +7,13 @@ from pathlib import Path
 from typing import Dict, Optional, Any, List
 from urllib.parse import urlparse
 
+# Load environment variables from .env file if available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, skip loading .env
+
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI as OpenRouterChatOpenAI
