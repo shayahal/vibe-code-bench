@@ -9,9 +9,8 @@ from pathlib import Path
 from vibe_code_bench.orchestrator.state import OrchestratorState
 from vibe_code_bench.core.logging_setup import get_logger
 from vibe_code_bench.core.reporting import FinalReportGenerator, ConsolidatedReportGenerator
-from vibe_code_bench.orchestrator.agents.vulnerability_merger import (
-    merge_vulnerabilities,
-    generate_merged_vulnerability_report
+from vibe_code_bench.orchestrator.agents.vulnerability_merger_agent import (
+    merge_vulnerabilities_with_agent
 )
 
 logger = get_logger(__name__)
@@ -50,35 +49,12 @@ def evaluator_node(state: OrchestratorState) -> OrchestratorState:
     website_builder_eval = state.get("website_builder_eval_results")
     red_team_eval = state.get("red_team_eval_results")
     
-    # Merge vulnerabilities from static analysis and red team
-    merged_vulnerabilities = merge_vulnerabilities(
+    # Merge vulnerabilities from static analysis and red team using agent-based deduplication
+    merged_vulnerabilities = merge_vulnerabilities_with_agent(
         static_analysis_result=static_analysis_result,
         red_team_result=red_team_result,
-        red_team_eval=red_team_eval
+        model_name=red_team_model
     )
-    
-    # Generate merged vulnerability report in final agent directory
-    if run_dir:
-        run_dir = Path(run_dir)
-        final_dir = run_dir / "reports" / "final"
-        final_dir.mkdir(parents=True, exist_ok=True)
-        
-        merged_report_path = final_dir / "merged_vulnerabilities.md"
-        merged_report_content = generate_merged_vulnerability_report(
-            merged_vulns=merged_vulnerabilities,
-            run_id=run_id,
-            url=url
-        )
-        with open(merged_report_path, 'w', encoding='utf-8') as f:
-            f.write(merged_report_content)
-        logger.info(f"Merged vulnerability report saved: {merged_report_path}")
-        
-        # Also save JSON
-        import json
-        merged_json_path = final_dir / "merged_vulnerabilities.json"
-        with open(merged_json_path, 'w', encoding='utf-8') as f:
-            json.dump(merged_vulnerabilities, f, indent=2, ensure_ascii=False)
-        logger.info(f"Merged vulnerability JSON saved: {merged_json_path}")
 
     # Generate consolidated run.json data
     run_data = ConsolidatedReportGenerator.generate_run_json(

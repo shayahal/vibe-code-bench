@@ -625,48 +625,45 @@ class ConsolidatedReportGenerator(ReportGenerator):
                     md.append(f"\n... and {len(found_vulns) - 10} more")
                 md.append("")
 
-        # Merged Vulnerabilities Section
+        # Merged Vulnerabilities Section - Consolidated into main report
         if merged_vulnerabilities:
-            md.append("## Unified Vulnerability Report")
+            md.append("## Security Vulnerabilities")
             md.append("")
             summary = merged_vulnerabilities.get('summary', {})
-            md.append(f"- **Total Vulnerabilities:** {summary.get('total', 0)}")
+            md.append(f"**Total:** {summary.get('total', 0)} vulnerabilities found")
             md.append("")
             
-            # By Severity
-            md.append("### By Severity")
-            md.append("")
+            # By Severity (compact)
             by_severity = summary.get('by_severity', {})
-            for severity in ['Critical', 'High', 'Medium', 'Low']:
-                count = by_severity.get(severity, 0)
-                if count > 0:
-                    md.append(f"- **{severity}:** {count}")
-            md.append("")
+            severity_counts = [f"{sev}: {by_severity.get(sev, 0)}" for sev in ['Critical', 'High', 'Medium', 'Low'] if by_severity.get(sev, 0) > 0]
+            if severity_counts:
+                md.append(f"**By Severity:** {', '.join(severity_counts)}")
+                md.append("")
             
-            # By Source
-            md.append("### By Source")
-            md.append("")
+            # By Source (compact)
             by_source = summary.get('by_source', {})
-            for source, count in by_source.items():
-                md.append(f"- **{source.replace('_', ' ').title()}:** {count}")
-            md.append("")
+            source_counts = [f"{src.replace('_', ' ').title()}: {count}" for src, count in by_source.items()]
+            if source_counts:
+                md.append(f"**By Source:** {', '.join(source_counts)}")
+                md.append("")
             
-            # Top vulnerabilities by severity
+            # List all vulnerabilities (concise format)
             by_severity_vulns = merged_vulnerabilities.get('by_severity', {})
-            for severity in ['Critical', 'High']:
+            for severity in ['Critical', 'High', 'Medium', 'Low']:
                 vulns = by_severity_vulns.get(severity, [])
                 if vulns:
-                    md.append(f"#### {severity} Severity Examples")
+                    md.append(f"### {severity} ({len(vulns)})")
                     md.append("")
-                    for vuln in vulns[:5]:  # Show top 5
-                        md.append(f"- **{vuln.get('id', 'Unknown')}:** {vuln.get('name', 'Unknown')[:80]}")
-                        md.append(f"  - Source: {vuln.get('source', 'unknown').replace('_', ' ').title()}, Type: {vuln.get('type', 'Unknown')}")
-                    if len(vulns) > 5:
-                        md.append(f"\n... and {len(vulns) - 5} more {severity} vulnerabilities")
+                    for vuln in vulns:
+                        sources = vuln.get('sources', [vuln.get('source', 'unknown')])
+                        source_str = ', '.join([s.replace('_', ' ').title() for s in sources])
+                        md.append(f"- **{vuln.get('id', 'Unknown')}:** {vuln.get('name', 'Unknown')} ({source_str})")
+                        if vuln.get('description'):
+                            desc = vuln.get('description', '')[:100]
+                            if len(vuln.get('description', '')) > 100:
+                                desc += "..."
+                            md.append(f"  - {desc}")
                     md.append("")
-            
-            md.append("> See `reports/final/merged_vulnerabilities.md` for complete detailed report")
-            md.append("")
 
         # Footer
         md.append("---")

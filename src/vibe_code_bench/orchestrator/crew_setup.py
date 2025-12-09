@@ -201,7 +201,21 @@ def execute_crew_workflow(context: OrchestratorContext, enable_observability: bo
         else:
             logger.info("Skipping website building and server management (using external URL)")
             results['website_builder'] = "Skipped - using external URL"
-            results['static_analysis'] = "Skipped - using external URL"
+            # Generate empty static analysis result for external URLs
+            from datetime import datetime
+            context.static_analysis_result = {
+                "run_id": context.run_id,
+                "timestamp": datetime.now().isoformat(),
+                "website_dir": None,
+                "tools": [],
+                "summary": {
+                    "total_vulnerabilities": 0,
+                    "by_severity": {"Critical": 0, "High": 0, "Medium": 0, "Low": 0},
+                    "by_tool": {}
+                },
+                "vulnerabilities": []
+            }
+            results['static_analysis'] = "Skipped - using external URL (no code to analyze)"
             results['server_start'] = "Skipped - using external URL"
         
         # Task 4: Red team testing
