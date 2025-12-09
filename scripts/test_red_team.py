@@ -18,12 +18,19 @@ try:
     from vibe_code_bench.core.paths import get_reports_dir
     reports_dir = get_reports_dir()
     
-    # Use the existing report
-    report_path = reports_dir / "browsing_discovery_20251209_142419_comprehensive.json"
+    # Find the most recent browsing report
+    import glob
+    report_files = list(reports_dir.glob("browsing_discovery_*_comprehensive.json"))
+    if not report_files:
+        report_files = list(reports_dir.glob("browsing_discovery_*.json"))
     
-    if not report_path.exists():
-        # Try without comprehensive suffix
-        report_path = reports_dir / "browsing_discovery_20251209_142419.json"
+    if not report_files:
+        print(f"Error: No browsing reports found in {reports_dir}")
+        print("Please run the browsing agent first to generate a report.")
+        sys.exit(1)
+    
+    # Use the most recent report
+    report_path = max(report_files, key=lambda p: p.stat().st_mtime)
     
     if not report_path.exists():
         print(f"Error: Browsing report not found. Expected: {report_path}")
