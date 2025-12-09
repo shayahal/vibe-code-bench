@@ -27,6 +27,8 @@ All output goes to `data/` at repo root:
 - `data/cache/` - Cache files (LLM cache, etc.)
 - `data/resources/` - Resources and static files
 
+All ac-hod tests and scripts should be stored in /scripts
+
 ### Examples
 
 **✅ CORRECT:**
