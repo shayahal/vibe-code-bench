@@ -9,9 +9,8 @@ from pathlib import Path
 from vibe_code_bench.orchestrator.state import OrchestratorState
 from vibe_code_bench.core.logging_setup import get_logger
 from vibe_code_bench.core.reporting import FinalReportGenerator, ConsolidatedReportGenerator
-from vibe_code_bench.orchestrator.agents.vulnerability_merger import (
-    merge_vulnerabilities,
-    generate_merged_vulnerability_report
+from vibe_code_bench.orchestrator.agents.vulnerability_merger_agent import (
+    merge_vulnerabilities_with_agent
 )
 
 logger = get_logger(__name__)
@@ -50,32 +49,12 @@ def evaluator_node(state: OrchestratorState) -> OrchestratorState:
     website_builder_eval = state.get("website_builder_eval_results")
     red_team_eval = state.get("red_team_eval_results")
     
-    # Merge vulnerabilities from static analysis and red team
-    merged_vulnerabilities = merge_vulnerabilities(
+    # Merge vulnerabilities from static analysis and red team using agent-based deduplication
+    merged_vulnerabilities = merge_vulnerabilities_with_agent(
         static_analysis_result=static_analysis_result,
         red_team_result=red_team_result,
-        red_team_eval=red_team_eval
+        model_name=red_team_model
     )
-    
-    # Generate merged vulnerability report
-    if run_dir:
-        merged_report_path = run_dir / "evals" / "merged_vulnerabilities.md"
-        merged_report_path.parent.mkdir(parents=True, exist_ok=True)
-        merged_report_content = generate_merged_vulnerability_report(
-            merged_vulns=merged_vulnerabilities,
-            run_id=run_id,
-            url=url
-        )
-        with open(merged_report_path, 'w', encoding='utf-8') as f:
-            f.write(merged_report_content)
-        logger.info(f"Merged vulnerability report saved: {merged_report_path}")
-        
-        # Also save JSON
-        import json
-        merged_json_path = run_dir / "evals" / "merged_vulnerabilities.json"
-        with open(merged_json_path, 'w', encoding='utf-8') as f:
-            json.dump(merged_vulnerabilities, f, indent=2, ensure_ascii=False)
-        logger.info(f"Merged vulnerability JSON saved: {merged_json_path}")
 
     # Generate consolidated run.json data
     run_data = ConsolidatedReportGenerator.generate_run_json(
@@ -107,12 +86,29 @@ def evaluator_node(state: OrchestratorState) -> OrchestratorState:
         merged_vulnerabilities=merged_vulnerabilities
     )
 
-    # Save consolidated reports to run directory
-    json_path, md_path = ConsolidatedReportGenerator.save_consolidated_reports(
-        run_dir=run_dir,
-        run_data=run_data,
-        markdown_content=markdown_content
-    )
+    # Save consolidated reports - main reports in root, detailed in final directory
+    run_dir = Path(run_dir)
+    
+    # Save main consolidated reports in root for easy access
+    json_path = run_dir / "run.json"
+    ConsolidatedReportGenerator.save_json_report(run_data, json_path)
+    
+    md_path = run_dir / "report.md"
+    ConsolidatedReportGenerator.save_markdown_report(markdown_content, md_path)
+    
+    # Also save detailed version in final agent directory
+    final_dir = run_dir / "reports" / "final"
+    final_dir.mkdir(parents=True, exist_ok=True)
+    final_json_path = final_dir / "run.json"
+    final_md_path = final_dir / "report.md"
+    ConsolidatedReportGenerator.save_json_report(run_data, final_json_path)
+    ConsolidatedReportGenerator.save_markdown_report(markdown_content, final_md_path)
+    
+    logger.info(f"Consolidated reports saved:")
+    logger.info(f"  Main run.json: {json_path}")
+    logger.info(f"  Main report.md: {md_path}")
+    logger.info(f"  Final run.json: {final_json_path}")
+    logger.info(f"  Final report.md: {final_md_path}")
 
     # Also generate legacy final report for backward compatibility
     final_report = FinalReportGenerator.generate_report(

@@ -140,16 +140,16 @@ The evaluation outputs a JSON file with this structure:
 
 ## Integration with Agent
 
-To automatically evaluate after each agent run, you can modify `red_team_agent.py`:
+To automatically evaluate after each agent run, you can integrate evaluation into your workflow:
 
 ```python
-from red_team_agent.eval import evaluate_report_file
+from vibe_code_bench.red_team_agent.eval import evaluate_report_file
 
 # After generating report
 results = evaluate_report_file(
     report_path=str(report_file),
     ground_truth_path="red_team_agent/eval/ground_truth_vulnerabilities.json",
-    url=args.url,
+    url=url,
     model_name=model_name,
     output_path=f"eval/eval_results_{run_id}.json"
 )

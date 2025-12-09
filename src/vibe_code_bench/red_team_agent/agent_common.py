@@ -1,8 +1,8 @@
 """
 Common functionality for Red Team Agent.
 
-This module contains shared code used by red_team_agent.py to avoid code duplication
-and provide reusable agent functionality.
+This module contains shared code used by the orchestrator red_team node and other
+components to provide reusable agent functionality.
 """
 
 import os

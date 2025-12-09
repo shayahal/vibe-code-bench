@@ -9,7 +9,7 @@ Coordinates the complete evaluation workflow:
 4. Server manager stops the website server
 5. Evaluator generates final comprehensive report
 
-Uses LangGraph's hierarchical agent teams framework for coordination.
+Uses CrewAI framework for multi-agent orchestration with built-in observability.
 """
 
 import os
@@ -53,93 +53,30 @@ class Orchestrator:
         self.website_builder_model = website_builder_model
         self.red_team_model = red_team_model
         
-        # Build LangGraph workflow
-        self.graph = self._build_graph()
+        # CrewAI crew will be created when needed (requires context)
+        self.crew = None
     
-    def _build_graph(self):
+    def run_full_evaluation(self, prompt: str = None, port: int = 5000, url: Optional[str] = None) -> Dict[str, Any]:
         """
-        Build the LangGraph workflow.
-        
-        Returns:
-            Compiled StateGraph
-        """
-        # Import LangGraph components
-        from langgraph.graph import StateGraph, END
-        
-        # Import orchestrator components
-        from vibe_code_bench.orchestrator.state import OrchestratorState
-        from vibe_code_bench.orchestrator.supervisor import supervisor_node
-        from vibe_code_bench.orchestrator.agents.website_builder import website_builder_node
-        from vibe_code_bench.orchestrator.agents.static_analysis import static_analysis_node
-        from vibe_code_bench.orchestrator.agents.red_team import red_team_node
-        from vibe_code_bench.orchestrator.agents.server_manager import server_manager_node
-        from vibe_code_bench.orchestrator.agents.website_builder_evaluator import website_builder_evaluator_node
-        from vibe_code_bench.orchestrator.agents.red_team_evaluator import red_team_evaluator_node
-        from vibe_code_bench.orchestrator.agents.evaluator import evaluator_node
-        
-        # Create state graph
-        workflow = StateGraph(OrchestratorState)
-        
-        # Add nodes
-        workflow.add_node("supervisor", supervisor_node)
-        workflow.add_node("website_builder", website_builder_node)
-        workflow.add_node("static_analysis", static_analysis_node)
-        workflow.add_node("server_manager", server_manager_node)
-        workflow.add_node("red_team_agent", red_team_node)
-        workflow.add_node("website_builder_evaluator", website_builder_evaluator_node)
-        workflow.add_node("red_team_evaluator", red_team_evaluator_node)
-        workflow.add_node("evaluator", evaluator_node)
-        
-        # Set entry point
-        workflow.set_entry_point("supervisor")
-        
-        # Add supervisor routing
-        workflow.add_conditional_edges(
-            "supervisor",
-            lambda state: state.get("next", "website_builder"),
-            {
-                "website_builder": "website_builder",
-                "static_analysis": "static_analysis",
-                "server_manager": "server_manager",
-                "red_team_agent": "red_team_agent",
-                "website_builder_evaluator": "website_builder_evaluator",
-                "red_team_evaluator": "red_team_evaluator",
-                "evaluator": "evaluator",
-                "__end__": END
-            }
-        )
-        
-        # Add edges from nodes back to supervisor
-        workflow.add_edge("website_builder", "supervisor")
-        workflow.add_edge("static_analysis", "supervisor")
-        workflow.add_edge("server_manager", "supervisor")
-        workflow.add_edge("red_team_agent", "supervisor")
-        workflow.add_edge("website_builder_evaluator", "supervisor")
-        workflow.add_edge("red_team_evaluator", "supervisor")
-        workflow.add_edge("evaluator", "supervisor")
-        
-        # Compile graph
-        return workflow.compile()
-    
-    def run_full_evaluation(self, prompt: str = None, port: int = 5000) -> Dict[str, Any]:
-        """
-        Run complete evaluation pipeline using LangGraph.
+        Run complete evaluation pipeline using CrewAI.
         
         Args:
-            prompt: Website prompt (default: pizzeria)
-            port: Port for website server
+            prompt: Website prompt (default: pizzeria) - ignored if url is provided
+            port: Port for website server - ignored if url is provided
+            url: External URL to test (if provided, skips website building and server management)
             
         Returns:
             Complete evaluation results
         """
         print("\n" + "="*70)
-        print("ORCHESTRATOR: Full Evaluation Pipeline (LangGraph)")
+        print("ORCHESTRATOR: Full Evaluation Pipeline (CrewAI)")
         print("="*70)
         
-        # Initialize state
+        # Initialize context
         from vibe_code_bench.website_generator.prompts import USER_PROMPT
-        from langchain_core.messages import HumanMessage
         from vibe_code_bench.core.paths import create_run_structure
+        from vibe_code_bench.orchestrator.crew_context import OrchestratorContext
+        from vibe_code_bench.orchestrator.crew_setup import create_crew
 
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -150,80 +87,63 @@ class Orchestrator:
             red_team_model=self.red_team_model
         )
 
-        initial_state = {
-            "messages": [HumanMessage(content="Start evaluation workflow")],
-            "run_id": run_id,
-            "prompt": prompt or USER_PROMPT,
-            "port": port,
-            # New structure paths
-            "run_dir": run_paths['run_dir'],
-            "website_dir": run_paths['website_dir'],
-            "logs_dir": run_paths['logs_dir'],
-            "run_json": run_paths['run_json'],
-            "report_md": run_paths['report_md'],
-            "red_team_report_file": run_paths['red_team_report_md'],
-            # Results
-            "build_result": None,
-            "url": None,
-            "server": None,
-            "static_analysis_result": None,
-            "red_team_result": None,
-            "website_builder_eval_results": None,
-            "red_team_eval_results": None,
-            "final_eval_results": None,
-            # Legacy paths (for backward compatibility)
-            "website_builder_eval_report_json": None,
-            "website_builder_eval_report_md": None,
-            "red_team_eval_report_json": None,
-            "red_team_eval_report_md": None,
-            "final_report": None,
-            "final_report_json": None,
-            "final_report_md": None,
-            "eval_results": None,  # Legacy field
-            # Routing
-            "next": "website_builder",
-            # Configuration
-            "output_dir": self.output_dir,
-            "website_builder_model": self.website_builder_model,
-            "red_team_model": self.red_team_model,
-            "website_builder_ground_truth_path": self.website_builder_ground_truth_path,
-            "red_team_ground_truth_path": self.red_team_ground_truth_path
-        }
+        # Create CrewAI context
+        context = OrchestratorContext(
+            run_id=run_id,
+            prompt=prompt or USER_PROMPT,
+            port=port,
+            run_dir=run_paths['run_dir'],
+            website_dir=run_paths['website_dir'],
+            logs_dir=run_paths['logs_dir'],
+            reports_dir=run_paths.get('reports_dir'),
+            agent_dirs=run_paths.get('agent_dirs'),
+            run_json=run_paths['run_json'],
+            report_md=run_paths['report_md'],
+            red_team_report_file=run_paths['red_team_report_md'],
+            output_dir=self.output_dir,
+            website_builder_model=self.website_builder_model,
+            red_team_model=self.red_team_model,
+            website_builder_ground_truth_path=self.website_builder_ground_truth_path,
+            red_team_ground_truth_path=self.red_team_ground_truth_path
+        )
+        
+        # If external URL is provided, set it in context and skip building
+        if url:
+            context.url = url
+            print(f"\nUsing external URL: {url}")
+            print("Skipping website building and server management")
         
         server = None
         
         try:
-            # Run the graph - stream returns states, not (node_name, state) tuples
-            final_state = None
-            for state_update in self.graph.stream(initial_state):
-                # state_update is a dict with node names as keys
-                if isinstance(state_update, dict):
-                    # Get the last node's state
-                    for node_name, node_state in state_update.items():
-                        final_state = node_state
-                        # Track server for cleanup
-                        if isinstance(node_state, dict) and "server" in node_state:
-                            server = node_state.get("server")
+            # Create CrewAI crew
+            crew = create_crew(context, enable_observability=True)
             
-            # Extract final state
-            if not final_state:
-                raise Exception("Graph execution did not return final state")
+            # Execute crew (this runs all tasks sequentially)
+            print("\nExecuting CrewAI workflow...")
+            result = crew.kickoff()
             
-            # Extract results from final state
-            run_id = final_state.get("run_id")
-            url = final_state.get("url")
-            build_result = final_state.get("build_result")
-            red_team_result = final_state.get("red_team_result")
-            final_report = final_state.get("final_report")
-            website_builder_eval = final_state.get("website_builder_eval_results")
-            red_team_eval = final_state.get("red_team_eval_results")
+            # Extract results from context
+            run_id = context.run_id
+            url = context.url
+            build_result = context.build_result
+            red_team_result = context.red_team_result
+            final_report = context.final_report
+            website_builder_eval = context.website_builder_eval_results
+            red_team_eval = context.red_team_eval_results
+            server = context.server
             
             # Core results are required, but evaluations are optional
-            if not all([run_id, url, build_result, red_team_result, final_report]):
+            # build_result is only required if we built a website (not using external URL)
+            required_results = [run_id, url, red_team_result, final_report]
+            if not url:
+                required_results.append(build_result)
+            
+            if not all(required_results):
                 missing = []
                 if not run_id: missing.append("run_id")
                 if not url: missing.append("url")
-                if not build_result: missing.append("build_result")
+                if not url and not build_result: missing.append("build_result")
                 if not red_team_result: missing.append("red_team_result")
                 if not final_report: missing.append("final_report")
                 raise Exception(f"Incomplete evaluation - missing required results: {', '.join(missing)}")
@@ -244,13 +164,11 @@ class Orchestrator:
                 print(f"  Detection Rate: {red_team_eval['metrics']['overall_detection_rate']:.2%}")
                 print(f"  Found: {red_team_eval['metrics']['found']}/{red_team_eval['metrics']['total_vulnerabilities']}")
             
-            final_report_json = final_state.get("final_report_json")
-            final_report_md = final_state.get("final_report_md")
             print(f"\nFinal Reports:")
-            if final_report_json:
-                print(f"  JSON: {final_report_json}")
-            if final_report_md:
-                print(f"  Markdown: {final_report_md}")
+            if context.run_json:
+                print(f"  JSON: {context.run_json}")
+            if context.report_md:
+                print(f"  Markdown: {context.report_md}")
             
             return final_report
             
@@ -319,7 +237,13 @@ def main():
         "--port",
         type=int,
         default=5000,
-        help="Port for website server"
+        help="Port for website server (ignored if --url is provided)"
+    )
+    parser.add_argument(
+        "--url",
+        type=str,
+        default=None,
+        help="External URL to test (if provided, skips website building and server management)"
     )
     
     args = parser.parse_args()
@@ -355,7 +279,8 @@ def main():
     try:
         results = orchestrator.run_full_evaluation(
             prompt=args.prompt,
-            port=args.port
+            port=args.port,
+            url=args.url
         )
         
         print("\n✓ Orchestration completed successfully!")

@@ -95,24 +95,30 @@ def red_team_node(state: OrchestratorState) -> OrchestratorState:
     
     # Save reports to run directory
     run_dir = state.get("run_dir")
-    red_team_report_md = state.get("red_team_report_file")
-
-    # Save the red team report to the designated file
-    if run_dir and red_team_report_md:
-        # Save markdown report to red_team_report.md
-        with open(red_team_report_md, 'w', encoding='utf-8') as f:
+    # Save reports to agent-specific directory
+    run_dir = state.get("run_dir")
+    if run_dir:
+        run_dir = Path(run_dir)
+        agent_dir = run_dir / "reports" / "red_team"
+        agent_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save markdown report
+        md_file = agent_dir / "red_team_report.md"
+        with open(md_file, 'w', encoding='utf-8') as f:
             f.write(report)
-        md_file = red_team_report_md
         logger.info(f"Red team report saved: {md_file}")
 
         # Also save structured JSON if available
+        json_file = None
         if structured_report:
             import json
-            json_file = run_dir / f"red_team_structured_{run_id}.json"
+            json_file = agent_dir / "red_team_structured.json"
             with open(json_file, 'w', encoding='utf-8') as f:
                 json.dump(structured_report, f, indent=2, ensure_ascii=False)
-        else:
-            json_file = None
+            logger.info(f"Red team structured JSON saved: {json_file}")
+        
+        # Update state with new report file path
+        state['red_team_report_file'] = md_file
     else:
         # Fallback to daily directory for backward compatibility
         from vibe_code_bench.core.paths import get_daily_reports_dir

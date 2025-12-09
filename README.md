@@ -159,57 +159,6 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 ---
 
-## Usage
-
-### Command-Line Usage
-
-#### Basic Security Assessment
-
-```bash
-python red_team_agent/red_team_agent.py --url https://example.com
-```
-
-#### With Custom Model
-
-```bash
-# Use GPT-4
-python red_team_agent/red_team_agent.py \
-  --url https://example.com \
-  --model openai/gpt-4
-
-# Use Claude Opus
-python red_team_agent/red_team_agent.py \
-  --url https://example.com \
-  --model anthropic/claude-3-opus
-
-# Use Gemini Pro
-python red_team_agent/red_team_agent.py \
-  --url https://example.com \
-  --model google/gemini-pro
-```
-
-#### With Custom API Key and Model
-
-```bash
-python red_team_agent/red_team_agent.py \
-  --url https://example.com \
-  --api-key your_openrouter_api_key \
-  --model openai/gpt-4
-```
-
-### Programmatic Usage
-
-```python
-from red_team_agent.red_team_agent import main
-import sys
-
-# Set up arguments
-sys.argv = ['red_team_agent.py', '--url', 'https://example.com']
-main()
-```
-
----
-
 ## Output & Reporting
 
 The agent generates comprehensive security reports in Markdown format:

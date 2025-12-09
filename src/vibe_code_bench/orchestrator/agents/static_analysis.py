@@ -20,6 +20,69 @@ from vibe_code_bench.core.logging_setup import get_logger
 logger = get_logger(__name__)
 
 
+def _generate_static_analysis_markdown(results: Dict[str, Any]) -> str:
+    """Generate markdown report for static analysis results."""
+    md = []
+    md.append("# Static Analysis Report")
+    md.append("")
+    md.append(f"**Run ID:** {results.get('run_id', 'unknown')}")
+    md.append(f"**Timestamp:** {results.get('timestamp', 'unknown')}")
+    md.append(f"**Website Directory:** `{results.get('website_dir', 'unknown')}`")
+    md.append("")
+    
+    summary = results.get('summary', {})
+    md.append("## Summary")
+    md.append("")
+    md.append(f"- **Total Vulnerabilities:** {summary.get('total_vulnerabilities', 0)}")
+    md.append("")
+    
+    by_severity = summary.get('by_severity', {})
+    md.append("### By Severity")
+    md.append("")
+    for severity in ['Critical', 'High', 'Medium', 'Low']:
+        count = by_severity.get(severity, 0)
+        if count > 0:
+            md.append(f"- **{severity}:** {count}")
+    md.append("")
+    
+    by_tool = summary.get('by_tool', {})
+    if by_tool:
+        md.append("### By Tool")
+        md.append("")
+        for tool, count in by_tool.items():
+            md.append(f"- **{tool}:** {count}")
+        md.append("")
+    
+    # Tool details
+    md.append("## Tool Results")
+    md.append("")
+    for tool_result in results.get('tools', []):
+        tool_name = tool_result.get('tool', 'unknown')
+        available = tool_result.get('available', False)
+        md.append(f"### {tool_name.replace('_', ' ').title()}")
+        md.append("")
+        if not available:
+            md.append(f"⚠️ **Status:** Not available - {tool_result.get('error', 'Unknown error')}")
+        else:
+            vulns = tool_result.get('vulnerabilities', [])
+            md.append(f"- **Status:** Available")
+            md.append(f"- **Vulnerabilities Found:** {len(vulns)}")
+            if 'files_scanned' in tool_result:
+                md.append(f"- **Files Scanned:** {tool_result.get('files_scanned', 0)}")
+            if vulns:
+                md.append("")
+                md.append("#### Top Vulnerabilities")
+                md.append("")
+                for vuln in vulns[:10]:
+                    md.append(f"- **{vuln.get('id', 'Unknown')}** ({vuln.get('severity', 'Unknown')})")
+                    md.append(f"  - {vuln.get('description', 'No description')[:100]}")
+                if len(vulns) > 10:
+                    md.append(f"\n... and {len(vulns) - 10} more")
+        md.append("")
+    
+    return "\n".join(md)
+
+
 def run_bandit(website_dir: Path) -> Dict[str, Any]:
     """
     Run Bandit security linter on Python files.
@@ -442,17 +505,28 @@ def static_analysis_node(state: OrchestratorState) -> OrchestratorState:
     
     results["vulnerabilities"] = all_vulnerabilities
     
-    # Save results to file
+    # Save results to agent-specific directory
     run_dir = state.get("run_dir")
     if run_dir:
         run_dir = Path(run_dir)
-        static_analysis_file = run_dir / "evals" / "static_analysis.json"
-        static_analysis_file.parent.mkdir(parents=True, exist_ok=True)
+        # Use agent-specific directory structure
+        agent_dir = run_dir / "reports" / "static_analysis"
+        agent_dir.mkdir(parents=True, exist_ok=True)
         
+        # Save JSON report
+        static_analysis_file = agent_dir / "static_analysis.json"
         with open(static_analysis_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Static analysis results saved: {static_analysis_file}")
+        # Also save a markdown summary
+        md_file = agent_dir / "static_analysis.md"
+        md_content = _generate_static_analysis_markdown(results)
+        with open(md_file, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+        
+        logger.info(f"Static analysis results saved:")
+        logger.info(f"  JSON: {static_analysis_file}")
+        logger.info(f"  Markdown: {md_file}")
     
     logger.info(f"Static analysis completed: {results['summary']['total_vulnerabilities']} vulnerabilities found")
     logger.info(f"  Critical: {results['summary']['by_severity']['Critical']}")
