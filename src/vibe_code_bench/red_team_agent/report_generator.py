@@ -292,6 +292,89 @@ def generate_run_report(
             trace_id=trace_id
         )
         
+        # Update markdown report with accurate data from structured report
+        if structured_report and structured_report.get("summary"):
+            summary = structured_report["summary"]
+            found_count = summary.get("found", 0)
+            
+            # Get all found vulnerabilities from structured report
+            all_vulns = structured_report.get("vulnerabilities", [])
+            found_vulns = [v for v in all_vulns if v.get("found", False)]
+            
+            # Count by severity from structured report
+            by_severity = structured_report.get("metrics", {}).get("by_severity", {})
+            severity_counts = []
+            for sev in ["Critical", "High", "Medium", "Low"]:
+                count = by_severity.get(sev, {}).get("found", 0)
+                if count > 0:
+                    severity_counts.append(f"{count} {sev}")
+            
+            # Replace the summary section with accurate counts
+            summary_pattern = r'(## Summary\n)(.*?)(?=\n## |\Z)'
+            
+            key_issues = summary.get('key_issues', [])
+            if isinstance(key_issues, list) and key_issues:
+                key_issues_str = ', '.join(key_issues[:2])  # Limit to first 2 issues
+            else:
+                key_issues_str = 'See detailed findings below' if found_count > 0 else 'No vulnerabilities detected'
+            
+            if severity_counts:
+                new_summary_content = f"""- Vulnerabilities: {found_count} total ({', '.join(severity_counts)})
+- Risk Level: {summary.get('risk_level', 'Unknown')}
+- Key Issues: {key_issues_str}"""
+            else:
+                new_summary_content = f"""- Vulnerabilities: {found_count} total
+- Risk Level: {summary.get('risk_level', 'Unknown')}
+- Key Issues: {key_issues_str}"""
+            
+            # Replace the summary content (keep the header)
+            def replace_summary(match):
+                return match.group(1) + new_summary_content
+            
+            full_report = re.sub(summary_pattern, replace_summary, full_report, flags=re.DOTALL)
+            
+            # Regenerate the Vulnerabilities section from structured report to ensure completeness
+            if found_vulns:
+                # Group vulnerabilities by severity
+                vulns_by_severity = {"Critical": [], "High": [], "Medium": [], "Low": []}
+                for vuln in found_vulns:
+                    severity = vuln.get("severity", "Medium")
+                    if severity in vulns_by_severity:
+                        vulns_by_severity[severity].append(vuln)
+                
+                # Build the complete Vulnerabilities section
+                vulnerabilities_section_lines = ["## Vulnerabilities", ""]
+                
+                for severity in ["Critical", "High", "Medium", "Low"]:
+                    vulns = vulns_by_severity[severity]
+                    if vulns:
+                        vulnerabilities_section_lines.append(f"### {severity}")
+                        vulnerabilities_section_lines.append("")
+                        
+                        for vuln in vulns:
+                            vuln_id = vuln.get("id", "")
+                            vuln_name = vuln.get("name", "Unknown")
+                            vuln_desc = vuln.get("agent_description") or vuln.get("description", "")
+                            vuln_fix = vuln.get("fix", "")
+                            
+                            vuln_line = f"- **{vuln_id}**: {vuln_name}"
+                            if vuln_desc:
+                                vuln_line += f" - {vuln_desc}"
+                            if vuln_fix:
+                                vuln_line += f". **Fix:** {vuln_fix}"
+                            
+                            vulnerabilities_section_lines.append(vuln_line)
+                        vulnerabilities_section_lines.append("")
+                
+                # Replace the entire Vulnerabilities section
+                vulnerabilities_section_pattern = r'(## Vulnerabilities\n)(.*?)(?=\n## |\Z)'
+                new_vulnerabilities_section = "\n".join(vulnerabilities_section_lines)
+                
+                def replace_vulnerabilities(match):
+                    return new_vulnerabilities_section
+                
+                full_report = re.sub(vulnerabilities_section_pattern, replace_vulnerabilities, full_report, flags=re.DOTALL)
+        
         return full_report, structured_report
         
     except Exception as e:
