@@ -56,7 +56,9 @@ class PageAnalyzer:
                         if links:
                             result["has_nav_menu"] = True
                             result["nav_selectors"].append(selector)
-                except Exception:
+                except Exception as e:
+                    # Log but continue - this is for trying different selectors
+                    logger.debug(f"Error trying selector {selector}: {e}")
                     continue
 
             # Extract all links
@@ -76,13 +78,7 @@ class PageAnalyzer:
             return result
 
         except Exception as e:
-            logger.error(f"Error analyzing navigation: {e}")
-            return {
-                "navigation_links": [],
-                "content_links": [],
-                "has_nav_menu": False,
-                "nav_selectors": [],
-            }
+            raise RuntimeError(f"Failed to analyze navigation for {base_url}: {e}") from e
 
     def extract_forms(self, html: str) -> List[Dict[str, Any]]:
         """
@@ -240,7 +236,7 @@ class PageAnalyzer:
                             forms.append(form_info)
 
         except Exception as e:
-            logger.error(f"Error extracting forms: {e}")
+            raise RuntimeError(f"Failed to extract forms from {base_url}: {e}") from e
 
         return forms
     

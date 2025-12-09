@@ -82,7 +82,7 @@ class BrowsingAgent:
         self.headless = headless
 
         # Initialize components
-        self.browser = BrowserWrapper(headless=headless)
+        self.browser = BrowserWrapper(headless=headless, enable_javascript=enable_javascript)
         self.discovery = DiscoveryEngine(respect_robots=respect_robots)
         self.analyzer = PageAnalyzer()
         self.auth_handler = AuthenticationHandler()
@@ -173,12 +173,9 @@ class BrowsingAgent:
                 Start by checking sitemap and robots.txt, then crawl links systematically.
                 Prioritize navigation links. Stop when you reach {self.max_pages} pages."""
 
-                # Run agent for guidance (though we'll still do direct crawling)
-                try:
-                    agent_result = self.langchain_agent.invoke({"input": agent_input})
-                    logger.info(f"Agent guidance: {agent_result.get('output', '')}")
-                except Exception as e:
-                    logger.warning(f"Agent execution error (continuing with direct crawl): {e}")
+                # Run agent for guidance - raise exception on failure
+                agent_result = self.langchain_agent.invoke({"input": agent_input})
+                logger.info(f"Agent guidance: {agent_result.get('output', '')}")
 
             # Also do direct crawling if agent didn't find enough pages
             # This ensures we reach the max_pages limit
@@ -193,27 +190,36 @@ class BrowsingAgent:
                 if not self.discovery.can_fetch(current_url):
                     continue
 
-                # Fetch page
-                page_result = self.browser.fetch_page(current_url)
-                if not page_result.get("success"):
+                # Fetch page - catch exceptions and skip this URL if it fails
+                try:
+                    page_result = self.browser.fetch_page(current_url)
+                    if not page_result.get("success"):
+                        logger.debug(f"Skipping {current_url}: fetch returned success=False")
+                        continue
+                except Exception as e:
+                    logger.warning(f"Failed to fetch {current_url}: {e}. Skipping and continuing.")
                     continue
 
                 # Mark as visited
                 self.discovery.mark_visited(current_url)
                 self.visited_urls.add(current_url)
 
-                # Analyze page
-                html = page_result["html"]
-                metadata = self.analyzer.extract_metadata(html)
-                nav_analysis = self.analyzer.analyze_navigation(html, current_url)
-                forms = self.analyzer.extract_forms(html)
-                page_type = self.analyzer.classify_page_type(html, current_url)
-                requires_auth = self.analyzer.detect_authentication_required(
-                    html, page_result.get("status_code")
-                )
+                # Analyze page - catch exceptions and skip this URL if analysis fails
+                try:
+                    html = page_result["html"]
+                    metadata = self.analyzer.extract_metadata(html)
+                    nav_analysis = self.analyzer.analyze_navigation(html, current_url)
+                    forms = self.analyzer.extract_forms(html)
+                    page_type = self.analyzer.classify_page_type(html, current_url)
+                    requires_auth = self.analyzer.detect_authentication_required(
+                        html, page_result.get("status_code")
+                    )
 
-                # Extract links (only same domain)
-                links = self.discovery.extract_links(html, current_url, same_domain_only=True)
+                    # Extract links (only same domain)
+                    links = self.discovery.extract_links(html, current_url, same_domain_only=True)
+                except Exception as e:
+                    logger.warning(f"Failed to analyze page {current_url}: {e}. Skipping and continuing.")
+                    continue
 
                 # Create page info
                 page_info = PageInfo(

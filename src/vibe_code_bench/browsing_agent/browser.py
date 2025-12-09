@@ -16,51 +16,68 @@ try:
         SimpleAnchorWebTaskTool,
     )
     ANCHOR_BROWSER_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     ANCHOR_BROWSER_AVAILABLE = False
-    logger.warning(
-        "langchain-anchorbrowser not installed. Using httpx fallback for page fetching. "
-        "Install with: pip install langchain-anchorbrowser for JavaScript rendering support."
-    )
+    raise ImportError(
+        "langchain-anchorbrowser is required. "
+        "Install with: pip install langchain-anchorbrowser"
+    ) from e
 
 
 class BrowserWrapper:
-    """Browser wrapper for page fetching with Anchor Browser tools (or httpx fallback)."""
+    """Browser wrapper for page fetching with Anchor Browser tools."""
 
-    def __init__(self, headless: bool = True, timeout: int = 30000):
+    def __init__(self, headless: bool = True, timeout: int = 30000, enable_javascript: bool = True):
         """
         Initialize browser wrapper.
 
         Args:
             headless: Run browser in headless mode (not used with Anchor Browser, kept for compatibility)
             timeout: Page load timeout in milliseconds
+            enable_javascript: Whether to enable JavaScript rendering (requires Anchor Browser)
+        
+        Raises:
+            ImportError: If langchain-anchorbrowser is not installed when enable_javascript=True
+            ValueError: If ANCHORBROWSER_API_KEY is not set when enable_javascript=True
+            RuntimeError: If Anchor Browser initialization fails when enable_javascript=True
         """
         self.headless = headless
         self.timeout = timeout / 1000.0  # Convert to seconds for httpx
-        self.use_anchor_browser = False
+        self.enable_javascript = enable_javascript
         
-        if ANCHOR_BROWSER_AVAILABLE:
-            # Check for API key
-            if os.environ.get("ANCHORBROWSER_API_KEY"):
-                try:
-                    # Initialize Anchor Browser tools
-                    self.content_tool = AnchorContentTool()
-                    self.screenshot_tool = AnchorScreenshotTool()
-                    self.web_task_tool = SimpleAnchorWebTaskTool()
-                    self.use_anchor_browser = True
-                    logger.info("Using Anchor Browser tools for page fetching")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize Anchor Browser tools: {e}. Using httpx fallback.")
-            else:
-                logger.warning(
-                    "ANCHORBROWSER_API_KEY not found in environment. "
-                    "Using httpx fallback (no JavaScript rendering)."
+        if enable_javascript:
+            if not ANCHOR_BROWSER_AVAILABLE:
+                raise ImportError(
+                    "langchain-anchorbrowser is required when enable_javascript=True. "
+                    "Install with: pip install langchain-anchorbrowser"
                 )
-        
-        if not self.use_anchor_browser:
-            # Use httpx as fallback
-            self.client = httpx.Client(timeout=self.timeout, follow_redirects=True)
-            logger.info("Using httpx for page fetching (no JavaScript rendering)")
+            
+            # Check for API key
+            api_key = os.environ.get("ANCHORBROWSER_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    "ANCHORBROWSER_API_KEY environment variable is required when enable_javascript=True. "
+                    "Set it in your .env file or environment."
+                )
+            
+            try:
+                # Initialize Anchor Browser tools
+                self.content_tool = AnchorContentTool()
+                self.screenshot_tool = AnchorScreenshotTool()
+                self.web_task_tool = SimpleAnchorWebTaskTool()
+                self.use_anchor_browser = True
+                logger.info("Using Anchor Browser tools for page fetching")
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to initialize Anchor Browser tools: {e}. "
+                    "Ensure ANCHORBROWSER_API_KEY is valid and langchain-anchorbrowser is properly installed."
+                ) from e
+        else:
+            # JavaScript disabled - not supported, raise error
+            raise ValueError(
+                "enable_javascript=False is not supported. "
+                "Anchor Browser is required for page fetching. Set enable_javascript=True."
+            )
 
     def __enter__(self):
         """Context manager entry."""
@@ -92,85 +109,51 @@ class BrowserWrapper:
         Returns:
             Dictionary with HTML content, status code, and metadata
         """
-        # Try Anchor Browser first if available
-        if self.use_anchor_browser:
-            try:
-                # Use AnchorContentTool to fetch page content
-                result = self.content_tool.invoke({"url": url, "format": "html"})
-                
-                # Parse the HTML to extract metadata
-                html = result if isinstance(result, str) else result.get("content", "")
-                
-                # Parse HTML to extract title and meta description
-                soup = BeautifulSoup(html, "html.parser")
-                title = None
-                meta_description = None
-                
-                title_tag = soup.find("title")
-                if title_tag:
-                    title = title_tag.get_text(strip=True)
-                
-                meta_desc_tag = soup.find("meta", attrs={"name": "description"})
-                if meta_desc_tag:
-                    meta_description = meta_desc_tag.get("content")
-                
-                # Try to get status code from result if available
-                status_code = None
-                if isinstance(result, dict):
-                    status_code = result.get("status_code", 200)
-                
-                return {
-                    "html": html,
-                    "url": url,
-                    "status_code": status_code or 200,
-                    "title": title,
-                    "meta_description": meta_description,
-                    "success": True,
-                }
-
-            except Exception as e:
-                logger.warning(f"Error fetching {url} with Anchor Browser: {e}. Falling back to httpx.")
-                # Fall through to httpx fallback
-        
-        # Use httpx fallback (either because Anchor Browser not available or it failed)
-        if not hasattr(self, 'client'):
-            # Initialize httpx client if not already done
-            self.client = httpx.Client(timeout=self.timeout, follow_redirects=True)
+        if not self.use_anchor_browser:
+            raise RuntimeError(
+                "Anchor Browser is not initialized. "
+                "Ensure langchain-anchorbrowser is installed and ANCHORBROWSER_API_KEY is set."
+            )
         
         try:
-            response = self.client.get(url)
-            html = response.text
-            soup = BeautifulSoup(html, "html.parser")
+            # Use AnchorContentTool to fetch page content
+            result = self.content_tool.invoke({"url": url, "format": "html"})
             
+            # Parse the HTML to extract metadata
+            html = result if isinstance(result, str) else result.get("content", "")
+            
+            # Parse HTML to extract title and meta description
+            soup = BeautifulSoup(html, "html.parser")
             title = None
+            meta_description = None
+            
             title_tag = soup.find("title")
             if title_tag:
                 title = title_tag.get_text(strip=True)
             
-            meta_description = None
             meta_desc_tag = soup.find("meta", attrs={"name": "description"})
             if meta_desc_tag:
                 meta_description = meta_desc_tag.get("content")
             
+            # Try to get status code from result if available
+            status_code = None
+            if isinstance(result, dict):
+                status_code = result.get("status_code", 200)
+            
             return {
                 "html": html,
-                "url": str(response.url),
-                "status_code": response.status_code,
+                "url": url,
+                "status_code": status_code or 200,
                 "title": title,
                 "meta_description": meta_description,
                 "success": True,
             }
+
         except Exception as e:
-            logger.error(f"Error fetching {url} with httpx: {e}")
-            return {
-                "html": "",
-                "url": url,
-                "status_code": None,
-                "title": None,
-                "meta_description": None,
-                "success": False,
-                "error": str(e),
-            }
+            raise RuntimeError(
+                f"Failed to fetch {url} with Anchor Browser: {e}. "
+                "Ensure ANCHORBROWSER_API_KEY is valid and the service is accessible."
+            ) from e
 
     def get_cookies(self) -> list:
         """Get all cookies (not supported by Anchor Browser, returns empty list for compatibility)."""
@@ -222,8 +205,7 @@ class BrowserWrapper:
             }
 
         except Exception as e:
-            logger.error(f"Error filling form on {url} with Anchor Browser: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-            }
+            raise RuntimeError(
+                f"Failed to fill form on {url} with Anchor Browser: {e}. "
+                "Ensure ANCHORBROWSER_API_KEY is valid and the form is accessible."
+            ) from e

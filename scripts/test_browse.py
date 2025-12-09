@@ -27,8 +27,8 @@ try:
     )
     
     # Discover pages
-    print(f"\nDiscovering pages on https://pizza-pal-reservations.lovable.app/...")
-    result = agent.discover("https://pizza-pal-reservations.lovable.app/")
+    print(f"\nDiscovering pages on https://shayahal.com/...")
+    result = agent.discover("https://shayahal.com/")
     
     # Print results
     print(f"\n{'='*60}")

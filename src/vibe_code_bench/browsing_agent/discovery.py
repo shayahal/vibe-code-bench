@@ -43,20 +43,23 @@ class DiscoveryEngine:
             url = urljoin(base_url, url)
         try:
             return url_normalize(url)
-        except Exception:
-            # Fallback to basic normalization
-            parsed = urlparse(url)
-            normalized = urlunparse(
-                (
-                    parsed.scheme.lower(),
-                    parsed.netloc.lower(),
-                    parsed.path,
-                    parsed.params,
-                    parsed.query,
-                    "",  # Remove fragment
+        except Exception as e:
+            # Try basic normalization as fallback
+            try:
+                parsed = urlparse(url)
+                normalized = urlunparse(
+                    (
+                        parsed.scheme.lower(),
+                        parsed.netloc.lower(),
+                        parsed.path,
+                        parsed.params,
+                        parsed.query,
+                        "",  # Remove fragment
+                    )
                 )
-            )
-            return normalized
+                return normalized
+            except Exception as e2:
+                raise RuntimeError(f"Failed to normalize URL {url}: {e}, fallback also failed: {e2}") from e2
 
     def check_sitemap(self, base_url: str) -> List[str]:
         """
@@ -155,7 +158,12 @@ class DiscoveryEngine:
                 logger.debug(f"robots.txt not found at {robots_url}")
 
         except Exception as e:
-            logger.debug(f"Error parsing robots.txt: {e}")
+            # robots.txt is optional, but if we try to parse it and fail, log and continue
+            # Only raise if it's a critical error (not just missing file)
+            if "404" not in str(e).lower() and "not found" not in str(e).lower():
+                logger.warning(f"Error parsing robots.txt (non-critical, continuing): {e}")
+            else:
+                logger.debug(f"robots.txt not found or not accessible: {e}")
 
         return result
 
@@ -229,7 +237,7 @@ class DiscoveryEngine:
                                 links.append(normalized)
 
         except Exception as e:
-            logger.error(f"Error extracting links: {e}")
+            raise RuntimeError(f"Failed to extract links from HTML for {base_url}: {e}") from e
 
         return list(set(links))  # Deduplicate
 

@@ -79,7 +79,7 @@ class AuthenticationHandler:
                         }
 
         except Exception as e:
-            logger.error(f"Error detecting login form: {e}")
+            raise RuntimeError(f"Failed to detect login form in {form_url}: {e}") from e
 
         return None
 
@@ -175,5 +175,4 @@ class AuthenticationHandler:
             return {"success": False, "error": result.get("error", "Form submission failed")}
 
         except Exception as e:
-            logger.error(f"Error during authentication: {e}")
-            return {"success": False, "error": str(e)}
+            raise RuntimeError(f"Authentication failed for {login_url}: {e}") from e
