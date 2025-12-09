@@ -5,7 +5,10 @@ langchain-anthropic>=0.1.0
 langchain-community>=0.0.20
 openai>=1.12.0
 langfuse
-langgraph>=0.0.20
+
+# CrewAI framework for multi-agent orchestration
+crewai>=0.28.0
+crewai[tools]>=0.28.0
 
 # Environment and HTTP
 python-dotenv>=1.0.0

@@ -665,7 +665,7 @@ class ConsolidatedReportGenerator(ReportGenerator):
                         md.append(f"\n... and {len(vulns) - 5} more {severity} vulnerabilities")
                     md.append("")
             
-            md.append("> See `evals/merged_vulnerabilities.md` for complete detailed report")
+            md.append("> See `reports/final/merged_vulnerabilities.md` for complete detailed report")
             md.append("")
 
         # Footer

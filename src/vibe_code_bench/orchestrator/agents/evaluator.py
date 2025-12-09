@@ -57,10 +57,13 @@ def evaluator_node(state: OrchestratorState) -> OrchestratorState:
         red_team_eval=red_team_eval
     )
     
-    # Generate merged vulnerability report
+    # Generate merged vulnerability report in final agent directory
     if run_dir:
-        merged_report_path = run_dir / "evals" / "merged_vulnerabilities.md"
-        merged_report_path.parent.mkdir(parents=True, exist_ok=True)
+        run_dir = Path(run_dir)
+        final_dir = run_dir / "reports" / "final"
+        final_dir.mkdir(parents=True, exist_ok=True)
+        
+        merged_report_path = final_dir / "merged_vulnerabilities.md"
         merged_report_content = generate_merged_vulnerability_report(
             merged_vulns=merged_vulnerabilities,
             run_id=run_id,
@@ -72,7 +75,7 @@ def evaluator_node(state: OrchestratorState) -> OrchestratorState:
         
         # Also save JSON
         import json
-        merged_json_path = run_dir / "evals" / "merged_vulnerabilities.json"
+        merged_json_path = final_dir / "merged_vulnerabilities.json"
         with open(merged_json_path, 'w', encoding='utf-8') as f:
             json.dump(merged_vulnerabilities, f, indent=2, ensure_ascii=False)
         logger.info(f"Merged vulnerability JSON saved: {merged_json_path}")
@@ -107,12 +110,29 @@ def evaluator_node(state: OrchestratorState) -> OrchestratorState:
         merged_vulnerabilities=merged_vulnerabilities
     )
 
-    # Save consolidated reports to run directory
-    json_path, md_path = ConsolidatedReportGenerator.save_consolidated_reports(
-        run_dir=run_dir,
-        run_data=run_data,
-        markdown_content=markdown_content
-    )
+    # Save consolidated reports - main reports in root, detailed in final directory
+    run_dir = Path(run_dir)
+    
+    # Save main consolidated reports in root for easy access
+    json_path = run_dir / "run.json"
+    ConsolidatedReportGenerator.save_json_report(run_data, json_path)
+    
+    md_path = run_dir / "report.md"
+    ConsolidatedReportGenerator.save_markdown_report(markdown_content, md_path)
+    
+    # Also save detailed version in final agent directory
+    final_dir = run_dir / "reports" / "final"
+    final_dir.mkdir(parents=True, exist_ok=True)
+    final_json_path = final_dir / "run.json"
+    final_md_path = final_dir / "report.md"
+    ConsolidatedReportGenerator.save_json_report(run_data, final_json_path)
+    ConsolidatedReportGenerator.save_markdown_report(markdown_content, final_md_path)
+    
+    logger.info(f"Consolidated reports saved:")
+    logger.info(f"  Main run.json: {json_path}")
+    logger.info(f"  Main report.md: {md_path}")
+    logger.info(f"  Final run.json: {final_json_path}")
+    logger.info(f"  Final report.md: {final_md_path}")
 
     # Also generate legacy final report for backward compatibility
     final_report = FinalReportGenerator.generate_report(

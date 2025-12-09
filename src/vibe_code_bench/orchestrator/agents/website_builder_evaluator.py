@@ -63,16 +63,31 @@ def website_builder_evaluator_node(state: OrchestratorState) -> OrchestratorStat
             builder_name=f"WebsiteBuilder-{website_builder_model}"
         )
         
-        # Save evaluation reports to daily directory
-        from vibe_code_bench.core.paths import get_daily_reports_dir
-        daily_reports_dir = get_daily_reports_dir(run_id)
-        json_path, md_path = WebsiteBuilderReportGenerator.save_report(
-            eval_results=website_builder_eval_results,
-            run_id=run_id,
-            output_dir=daily_reports_dir
-        )
-        website_builder_eval_report_json = json_path
-        website_builder_eval_report_md = md_path
+        # Save evaluation reports to agent-specific directory
+        run_dir = state.get("run_dir")
+        if run_dir:
+            run_dir = Path(run_dir)
+            agent_dir = run_dir / "reports" / "website_builder_evaluator"
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            
+            json_path, md_path = WebsiteBuilderReportGenerator.save_report(
+                eval_results=website_builder_eval_results,
+                run_id=run_id,
+                output_dir=agent_dir
+            )
+            website_builder_eval_report_json = json_path
+            website_builder_eval_report_md = md_path
+        else:
+            # Fallback to daily directory
+            from vibe_code_bench.core.paths import get_daily_reports_dir
+            daily_reports_dir = get_daily_reports_dir(run_id)
+            json_path, md_path = WebsiteBuilderReportGenerator.save_report(
+                eval_results=website_builder_eval_results,
+                run_id=run_id,
+                output_dir=daily_reports_dir
+            )
+            website_builder_eval_report_json = json_path
+            website_builder_eval_report_md = md_path
         
         logger.info("Website builder evaluation completed")
         logger.info(f"  Quality score: {website_builder_eval_results['metrics']['overall_quality_score']:.2%}")

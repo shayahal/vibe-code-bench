@@ -65,16 +65,31 @@ def red_team_evaluator_node(state: OrchestratorState) -> OrchestratorState:
             model_name=red_team_model
         )
         
-        # Save evaluation reports to daily directory
-        from vibe_code_bench.core.paths import get_daily_reports_dir
-        daily_reports_dir = get_daily_reports_dir(run_id)
-        json_path, md_path = RedTeamReportGenerator.save_report(
-            eval_results=red_team_eval_results,
-            run_id=run_id,
-            output_dir=daily_reports_dir
-        )
-        red_team_eval_report_json = json_path
-        red_team_eval_report_md = md_path
+        # Save evaluation reports to agent-specific directory
+        run_dir = state.get("run_dir")
+        if run_dir:
+            run_dir = Path(run_dir)
+            agent_dir = run_dir / "reports" / "red_team_evaluator"
+            agent_dir.mkdir(parents=True, exist_ok=True)
+            
+            json_path, md_path = RedTeamReportGenerator.save_report(
+                eval_results=red_team_eval_results,
+                run_id=run_id,
+                output_dir=agent_dir
+            )
+            red_team_eval_report_json = json_path
+            red_team_eval_report_md = md_path
+        else:
+            # Fallback to daily directory
+            from vibe_code_bench.core.paths import get_daily_reports_dir
+            daily_reports_dir = get_daily_reports_dir(run_id)
+            json_path, md_path = RedTeamReportGenerator.save_report(
+                eval_results=red_team_eval_results,
+                run_id=run_id,
+                output_dir=daily_reports_dir
+            )
+            red_team_eval_report_json = json_path
+            red_team_eval_report_md = md_path
         
         logger.info("Red team evaluation completed")
         logger.info(f"  Detection rate: {red_team_eval_results['metrics']['overall_detection_rate']:.2%}")

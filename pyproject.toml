@@ -33,7 +33,8 @@ dependencies = [
     "langchain-community>=0.0.20",
     "openai>=1.12.0",
     "langfuse>=2.0.0",
-    "langgraph>=0.0.20",
+    "crewai>=0.28.0",
+    "crewai[tools]>=0.28.0",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
     "httpx>=0.25.0",
@@ -59,7 +60,6 @@ dev = [
 ]
 
 [project.scripts]
-red-team-agent = "vibe_code_bench.red_team_agent.red_team_agent:main"
 website-generator = "vibe_code_bench.website_generator.main:main"
 orchestrator = "vibe_code_bench.orchestrator.main:main"
 

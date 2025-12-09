@@ -256,15 +256,21 @@ def create_run_structure(
     red_team_model: Optional[str] = None
 ) -> Dict[str, Path]:
     """
-    Create complete directory structure for a run.
+    Create complete directory structure for a run organized by agents.
 
     Structure:
         YYYYMMDD/HHMMSS_{wb_model}_{rt_model}/
             ├── run.json
             ├── report.md
             ├── website/
-            ├── red_team_report.md
-            └── logs/
+            ├── logs/
+            └── reports/
+                ├── website_builder/
+                ├── static_analysis/
+                ├── red_team/
+                ├── website_builder_evaluator/
+                ├── red_team_evaluator/
+                └── final/
 
     Args:
         run_id: Run ID (format: YYYYMMDD_HHMMSS)
@@ -283,13 +289,31 @@ def create_run_structure(
     logs_dir = run_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
 
+    # Create agent-specific report directories
+    reports_dir = run_dir / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    
+    agent_dirs = {
+        'website_builder': reports_dir / "website_builder",
+        'static_analysis': reports_dir / "static_analysis",
+        'red_team': reports_dir / "red_team",
+        'website_builder_evaluator': reports_dir / "website_builder_evaluator",
+        'red_team_evaluator': reports_dir / "red_team_evaluator",
+        'final': reports_dir / "final"
+    }
+    
+    for agent_dir in agent_dirs.values():
+        agent_dir.mkdir(exist_ok=True)
+
     return {
         'run_dir': run_dir,
         'website_dir': website_dir,
         'logs_dir': logs_dir,
+        'reports_dir': reports_dir,
+        'agent_dirs': agent_dirs,
         'run_json': run_dir / "run.json",
         'report_md': run_dir / "report.md",
-        'red_team_report_md': run_dir / "red_team_report.md"
+        'red_team_report_md': agent_dirs['red_team'] / "red_team_report.md"
     }
 
 
