@@ -52,7 +52,7 @@ class BrowsingAgent:
     def __init__(
         self,
         max_pages: int = 50,
-        respect_robots: bool = True,
+        respect_robots: bool = False,
         enable_javascript: bool = True,
         headless: bool = True,
         llm=None,
@@ -259,6 +259,12 @@ class BrowsingAgent:
                 # Stop if we've reached max pages
                 if len(self.discovered_pages) >= self.max_pages:
                     break
+
+            # Determine if authentication is required based on:
+            # 1. Whether we authenticated during discovery (auth_credentials provided)
+            # 2. Whether any discovered pages require authentication
+            any_page_requires_auth = any(page.requires_auth for page in self.discovered_pages)
+            authentication_required = authentication_required or any_page_requires_auth
 
             # Create result
             discovery_result = DiscoveryResult(

@@ -21,7 +21,7 @@ try:
     print("Initializing browsing agent...")
     agent = BrowsingAgent(
         max_pages=10,
-        respect_robots=True,
+        respect_robots=False,
         enable_javascript=True,
         headless=True
     )
