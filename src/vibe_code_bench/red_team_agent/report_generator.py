@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from vibe_code_bench.core.paths import get_reports_dir
+from vibe_code_bench.core.paths import get_reports_dir, get_reports_dir_for_date
 from vibe_code_bench.red_team_agent.models import (
     VulnerabilityFinding,
     SecurityTestResult,
@@ -287,8 +287,23 @@ class ReportGenerator:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             run_id = f"red_team_{timestamp}"
 
-        reports_dir = get_reports_dir()
-        report_file = reports_dir / f"{run_id}.json"
+        # Extract date from run_id or use today
+        try:
+            if len(run_id) >= 17:  # red_team_YYYYMMDD_HHMMSS
+                date_part = run_id[9:17]  # YYYYMMDD
+                date_str = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
+            else:
+                date_str = datetime.now().strftime("%Y-%m-%d")
+        except:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+        
+        reports_dir = get_reports_dir_for_date(date_str)
+        # Use unified run folder (extract base run_id without prefix)
+        from vibe_code_bench.core.paths import extract_base_run_id
+        base_run_id = extract_base_run_id(run_id)
+        run_folder = reports_dir / base_run_id
+        run_folder.mkdir(parents=True, exist_ok=True)
+        report_file = run_folder / f"{run_id}.json"
 
         # Convert report to dict and save JSON
         report_dict = report.to_dict()
@@ -297,13 +312,42 @@ class ReportGenerator:
 
         self.logger.info(f"[PHASE] JSON report saved to: {report_file}")
 
-        # Save markdown report if run_dir is provided
+        # Generate and save concise markdown report to reports directory
+        try:
+            from vibe_code_bench.core.report_models import red_team_report_to_red_team_data
+            from vibe_code_bench.core.report_generators import RedTeamReportGenerator
+
+            red_team_data = red_team_report_to_red_team_data(report, run_id=run_id)
+            concise_markdown_path = RedTeamReportGenerator.save_report(red_team_data, run_id=run_id)
+            self.logger.info(f"[PHASE] Concise markdown report saved to: {concise_markdown_path}")
+            
+            # Generate and save detailed markdown report
+            try:
+                from vibe_code_bench.core.detailed_report_generators import RedTeamDetailedReportGenerator
+                
+                # Get testing plan from report generator (it's set in __init__)
+                testing_plan = self.testing_plan
+                
+                detailed_path = RedTeamDetailedReportGenerator.save_detailed_report(
+                    red_team_data,
+                    red_team_report=report,
+                    testing_plan=testing_plan,
+                    run_dir=run_dir,
+                    run_id=run_id,
+                )
+                self.logger.info(f"[PHASE] Detailed markdown report saved to: {detailed_path}")
+            except Exception as e:
+                self.logger.warning(f"[PHASE] Failed to generate detailed markdown report: {e}")
+        except Exception as e:
+            self.logger.warning(f"[PHASE] Failed to generate concise markdown report: {e}")
+
+        # Save detailed markdown report if run_dir is provided (for backward compatibility)
         if run_dir:
             markdown_file = run_dir / f"{run_id}_report.md"
             markdown_content = self._generate_markdown_report(report)
             with open(markdown_file, "w", encoding="utf-8") as f:
                 f.write(markdown_content)
-            self.logger.info(f"[PHASE] Markdown report saved to: {markdown_file}")
+            self.logger.info(f"[PHASE] Detailed markdown report saved to: {markdown_file}")
             
             # Save summary markdown
             summary_file = run_dir / f"{run_id}_summary.md"

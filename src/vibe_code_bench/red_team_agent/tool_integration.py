@@ -22,7 +22,26 @@ class ToolIntegration:
     def __init__(self):
         """Initialize tool integration."""
         self.logger = get_logger(f"{__name__}.ToolIntegration")
+        # Ensure Go bin directories are in PATH for tool detection
+        self._ensure_go_bin_in_path()
         self.available_tools = self._check_available_tools()
+
+    def _ensure_go_bin_in_path(self):
+        """Ensure Go bin directories are in PATH for tool detection."""
+        import os
+        path = os.environ.get("PATH", "")
+        
+        # Common Go bin locations
+        go_bin_paths = [
+            os.path.expanduser("~/go/bin"),
+            os.path.join(os.environ.get("GOPATH", ""), "bin"),
+        ]
+        
+        for go_bin_path in go_bin_paths:
+            if go_bin_path and os.path.exists(go_bin_path):
+                if go_bin_path not in path:
+                    os.environ["PATH"] = f"{path}:{go_bin_path}"
+                    self.logger.debug(f"[SETUP] Added {go_bin_path} to PATH for tool detection")
 
     def _check_available_tools(self) -> Dict[str, bool]:
         """
@@ -39,12 +58,22 @@ class ToolIntegration:
             "nikto": False,
         }
 
-        for tool_name in tools.keys():
-            if shutil.which(tool_name):
+        # Map tool names to their actual command names
+        # Note: wapiti3 package installs as "wapiti" command
+        tool_commands = {
+            "nuclei": "nuclei",
+            "dalfox": "dalfox",
+            "sqlmap": "sqlmap",
+            "wapiti3": "wapiti",  # wapiti3 package installs as "wapiti" command
+            "nikto": "nikto",
+        }
+
+        for tool_name, command_name in tool_commands.items():
+            if shutil.which(command_name):
                 tools[tool_name] = True
-                self.logger.info(f"[SETUP] {tool_name} is available")
+                self.logger.info(f"[SETUP] {tool_name} is available (command: {command_name})")
             else:
-                self.logger.debug(f"[SETUP] {tool_name} is not available")
+                self.logger.debug(f"[SETUP] {tool_name} is not available (command: {command_name} not found)")
 
         return tools
 
@@ -132,6 +161,8 @@ class ToolIntegration:
             self.logger.error("[ERROR] nuclei scan timed out")
         except Exception as e:
             self.logger.error(f"[ERROR] nuclei scan failed: {e}")
+            from vibe_code_bench.core.error_logger import log_exception
+            log_exception(e, context="red_team_agent.tool_integration.nuclei_scan", metadata={"base_url": base_url})
 
         return results
 
@@ -278,6 +309,8 @@ class ToolIntegration:
             self.logger.warning(f"[TOOL] sqlmap scan timed out for {url}")
         except Exception as e:
             self.logger.error(f"[ERROR] sqlmap scan failed: {e}")
+            from vibe_code_bench.core.error_logger import log_exception
+            log_exception(e, context="red_team_agent.tool_integration.sqlmap_scan", metadata={"url": url})
 
         return None
 
@@ -359,6 +392,8 @@ class ToolIntegration:
             self.logger.error("[ERROR] wapiti3 scan timed out")
         except Exception as e:
             self.logger.error(f"[ERROR] wapiti3 scan failed: {e}")
+            from vibe_code_bench.core.error_logger import log_exception
+            log_exception(e, context="red_team_agent.tool_integration.wapiti3_scan", metadata={"base_url": base_url})
 
         return results
 
@@ -426,5 +461,7 @@ class ToolIntegration:
             self.logger.error("[ERROR] nikto scan timed out")
         except Exception as e:
             self.logger.error(f"[ERROR] nikto scan failed: {e}")
+            from vibe_code_bench.core.error_logger import log_exception
+            log_exception(e, context="red_team_agent.tool_integration.nikto_scan", metadata={"base_url": base_url})
 
         return results

@@ -49,6 +49,7 @@ dependencies = [
     "pytest-mock>=3.11.0",
     "pytest-cov>=4.1.0",
     "responses>=0.23.0",
+    "wapiti3>=3.1.0",  # Web application vulnerability scanner (optional but recommended)
 ]
 
 [project.optional-dependencies]

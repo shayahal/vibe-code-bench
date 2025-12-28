@@ -367,6 +367,8 @@ Use the analyze_page_security tool first to understand the page, then test for v
 
             except Exception as e:
                 self.logger.error(f"[ERROR] LLM agent test failed for {url}: {e}")
+                from vibe_code_bench.core.error_logger import log_exception
+                log_exception(e, context="red_team_agent.llm_tester.test_pages", metadata={"url": url})
                 result = SecurityTestResult(
                     test_type="LLM-Guided",
                     target_url=url,

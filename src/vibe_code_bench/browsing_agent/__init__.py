@@ -37,7 +37,7 @@ def _create_default_llm():
         return ChatOpenAI(model="gpt-4", temperature=0)
     # Try Anthropic
     elif os.getenv("ANTHROPIC_API_KEY"):
-        return ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
+        return ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0)
     # Try OpenRouter (supports multiple models)
     elif os.getenv("OPENROUTER_API_KEY"):
         # OpenRouter uses OpenAI-compatible API
@@ -105,9 +105,12 @@ class BrowsingAgent:
         self.discovered_pages: List[PageInfo] = []
         self.visited_urls: set = set()
         self.base_url: Optional[str] = None
+        
+        # Error logging
+        self.error_logger = None
 
     def discover(
-        self, url: str, auth_credentials: Optional[Dict[str, str]] = None
+        self, url: str, auth_credentials: Optional[Dict[str, str]] = None, error_log_path: Optional[Path] = None
     ) -> DiscoveryResult:
         """
         Discover pages from a website.
@@ -115,10 +118,16 @@ class BrowsingAgent:
         Args:
             url: Base URL of the website to discover
             auth_credentials: Optional dictionary with 'username' and 'password' for authentication
+            error_log_path: Optional path to error log file
 
         Returns:
             DiscoveryResult with discovered pages
         """
+        # Setup error logging if path provided
+        if error_log_path:
+            from vibe_code_bench.core.error_logger import setup_error_logging
+            self.error_logger = setup_error_logging(error_log_path)
+        
         self.base_url = url
         self.discovered_pages = []
         self.visited_urls = set()
@@ -174,8 +183,19 @@ class BrowsingAgent:
                 Prioritize navigation links. Stop when you reach {self.max_pages} pages."""
 
                 # Run agent for guidance - raise exception on failure
-                agent_result = self.langchain_agent.invoke({"input": agent_input})
-                logger.info(f"Agent guidance: {agent_result.get('output', '')}")
+                try:
+                    agent_result = self.langchain_agent.invoke({"input": agent_input})
+                    logger.info(f"Agent guidance: {agent_result.get('output', '')}")
+                except Exception as e:
+                    logger.warning(f"LangChain agent invocation failed: {e}")
+                    if self.error_logger:
+                        self.error_logger.log_exception(
+                            e,
+                            context="browsing_agent.discover.langchain_agent",
+                            metadata={"url": url, "agent_input": agent_input[:200]}
+                        )
+                    # Continue without agent guidance
+                    agent_result = {"output": "Agent guidance unavailable"}
 
             # Also do direct crawling if agent didn't find enough pages
             # This ensures we reach the max_pages limit
@@ -198,6 +218,12 @@ class BrowsingAgent:
                         continue
                 except Exception as e:
                     logger.warning(f"Failed to fetch {current_url}: {e}. Skipping and continuing.")
+                    if self.error_logger:
+                        self.error_logger.log_exception(
+                            e,
+                            context=f"browsing_agent.discover.fetch_page",
+                            metadata={"url": current_url}
+                        )
                     continue
 
                 # Mark as visited
@@ -219,6 +245,12 @@ class BrowsingAgent:
                     links = self.discovery.extract_links(html, current_url, same_domain_only=True)
                 except Exception as e:
                     logger.warning(f"Failed to analyze page {current_url}: {e}. Skipping and continuing.")
+                    if self.error_logger:
+                        self.error_logger.log_exception(
+                            e,
+                            context=f"browsing_agent.discover.analyze_page",
+                            metadata={"url": current_url}
+                        )
                     continue
 
                 # Create page info
@@ -292,37 +324,69 @@ class BrowsingAgent:
 
             return discovery_result
 
+        except Exception as e:
+            logger.error(f"Discovery failed: {e}", exc_info=True)
+            if self.error_logger:
+                self.error_logger.log_exception(
+                    e,
+                    context="browsing_agent.discover",
+                    metadata={"url": url}
+                )
+            raise
         finally:
             # Cleanup
             self.browser.close()
+            # Error summary will be saved in save_results if error logger exists
 
     def save_results(
-        self, result: DiscoveryResult, output_path: Optional[str] = None, save_summary: bool = True
+        self, result: DiscoveryResult, output_path: Optional[str] = None, save_summary: bool = True, run_id: Optional[str] = None, error_log_path: Optional[Path] = None
     ) -> Dict[str, str]:
         """
-        Save discovery results to JSON files (comprehensive and summary).
+        Save discovery results to JSON files (comprehensive and summary) and generate concise markdown report.
 
         Args:
             result: DiscoveryResult to save
             output_path: Optional output path prefix (if None, uses default location)
             save_summary: Whether to save a summary report
+            run_id: Optional run ID for consistent naming
 
         Returns:
-            Dictionary with paths to saved files: {'comprehensive': path, 'summary': path}
+            Dictionary with paths to saved files: {'comprehensive': path, 'summary': path, 'markdown': path}
         """
         from vibe_code_bench.core.paths import get_reports_dir
+        from vibe_code_bench.core.report_models import discovery_result_to_browsing_data
+        from vibe_code_bench.core.report_generators import BrowsingReportGenerator
 
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_dir = get_reports_dir()
-            comprehensive_path = str(output_dir / f"browsing_discovery_{timestamp}_comprehensive.json")
-            summary_path = str(output_dir / f"browsing_discovery_{timestamp}_summary.json")
+            if not run_id:
+                run_id = f"browsing_{timestamp}"
+            # Use day-based folder with unified run-specific subfolder
+            from vibe_code_bench.core.paths import get_reports_dir_for_date, extract_base_run_id
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            reports_dir = get_reports_dir_for_date(date_str)
+            # Use unified run folder (extract base run_id without prefix)
+            base_run_id = extract_base_run_id(run_id)
+            run_folder = reports_dir / base_run_id
+            run_folder.mkdir(parents=True, exist_ok=True)
+            comprehensive_path = str(run_folder / f"browsing_discovery_{timestamp}_comprehensive.json")
+            summary_path = str(run_folder / f"browsing_discovery_{timestamp}_summary.json")
+            
+            # Setup error logging if not already set
+            if not self.error_logger:
+                if error_log_path is None:
+                    error_log_path = run_folder / "errors.log"
+                from vibe_code_bench.core.error_logger import setup_error_logging
+                self.error_logger = setup_error_logging(error_log_path)
+                self._current_run_id = run_id
         else:
             from vibe_code_bench.core.paths import get_absolute_path
 
             base_path = get_absolute_path(output_path)
             comprehensive_path = str(base_path.parent / f"{base_path.stem}_comprehensive.json")
             summary_path = str(base_path.parent / f"{base_path.stem}_summary.json")
+            if not run_id:
+                run_id = base_path.stem
 
         # Ensure directory exists
         Path(comprehensive_path).parent.mkdir(parents=True, exist_ok=True)
@@ -334,16 +398,84 @@ class BrowsingAgent:
         logger.info(f"Comprehensive report saved to {comprehensive_path}")
 
         # Save summary report
+        saved_paths = {"comprehensive": comprehensive_path}
         if save_summary:
             summary = self._create_summary_report(result)
             with open(summary_path, "w", encoding="utf-8") as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False)
 
             logger.info(f"Summary report saved to {summary_path}")
+            saved_paths["summary"] = summary_path
 
-            return {"comprehensive": comprehensive_path, "summary": summary_path}
-        else:
-            return {"comprehensive": comprehensive_path}
+            # Generate and save concise markdown report
+        try:
+            # Determine tools used
+            tools_used = []
+            if self.llm is not None:
+                tools_used.append("llm_agent")
+            if self.enable_javascript:
+                tools_used.append("javascript_rendering")
+            tools_used.append("browser_crawl")
+            if result.sitemap_used:
+                tools_used.append("sitemap")
+            
+            browsing_data = discovery_result_to_browsing_data(result, run_id=run_id, tools_used=tools_used)
+            markdown_path = BrowsingReportGenerator.save_report(browsing_data, run_id=run_id)
+            logger.info(f"Concise markdown report saved to {markdown_path}")
+            saved_paths["markdown"] = str(markdown_path)
+            
+            # Save error summary if error logger was used
+            if self.error_logger:
+                try:
+                    error_summary_path = run_folder / "errors.json"
+                    self.error_logger.save_summary(error_summary_path)
+                    logger.info(f"Error summary saved to {error_summary_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to save error summary: {e}")
+            
+            # Generate and save detailed markdown report
+            try:
+                from vibe_code_bench.core.detailed_report_generators import BrowsingDetailedReportGenerator
+                from vibe_code_bench.core.paths import get_reports_dir_for_date
+                
+                # Extract agent output if available (from langchain agent)
+                agent_output = None
+                if hasattr(self, 'langchain_agent') and self.langchain_agent is not None:
+                    # Try to get last agent output from logs or state
+                    agent_output = "Agent guidance was used during discovery process."
+                
+                # Get testing plan if available (will be None for browsing agent, but included for future use)
+                testing_plan = None
+                
+                # Try to find run directory
+                run_dir = None
+                try:
+                    from vibe_code_bench.core.run_directory import find_report_by_run_id
+                    # Run directory would be in runs/browsing_agent/ if it exists
+                    from vibe_code_bench.core.paths import get_runs_dir
+                    runs_dir = get_runs_dir()
+                    browsing_runs = list((runs_dir / "browsing_agent").glob(f"*{run_id.replace('browsing_', '')}*"))
+                    if browsing_runs:
+                        run_dir = browsing_runs[0]
+                except:
+                    pass
+                
+                detailed_path = BrowsingDetailedReportGenerator.save_detailed_report(
+                    browsing_data,
+                    discovery_result=result,
+                    testing_plan=testing_plan,
+                    run_dir=run_dir,
+                    agent_output=agent_output,
+                    run_id=run_id,
+                )
+                logger.info(f"Detailed markdown report saved to {detailed_path}")
+                saved_paths["detailed"] = str(detailed_path)
+            except Exception as e:
+                logger.warning(f"Failed to generate detailed markdown report: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to generate concise markdown report: {e}")
+
+        return saved_paths
 
     def _create_summary_report(self, result: DiscoveryResult) -> Dict[str, Any]:
         """

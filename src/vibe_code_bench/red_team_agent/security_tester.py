@@ -45,10 +45,11 @@ class SecurityTester:
         self.max_parallel_workers = max_parallel_workers
 
         # Initialize testing modules
-        self.form_tester = FormTester(use_anchor_browser=use_anchor_browser)
+        self.tool_integration = ToolIntegration() if enable_automated_scanning else None
+        # Pass tool_integration to FormTester so it can use dalfox and sqlmap
+        self.form_tester = FormTester(use_anchor_browser=use_anchor_browser, tool_integration=self.tool_integration)
         self.auth_tester = AuthTester(use_anchor_browser=use_anchor_browser)
         self.api_tester = APITester()
-        self.tool_integration = ToolIntegration() if enable_automated_scanning else None
         self.llm_tester = LLMTester(llm, use_anchor_browser=use_anchor_browser) if enable_llm_testing and llm else None
 
         self.all_results: List[SecurityTestResult] = []
@@ -98,6 +99,12 @@ class SecurityTester:
             self.logger.info(f"[TOOL] Running nikto on {base_url}")
             nikto_results = self.tool_integration.run_nikto(base_url)
             results.extend(nikto_results)
+
+        # Run dalfox on all URLs for URL-based XSS testing
+        if self.tool_integration.available_tools.get("dalfox", False) and all_urls:
+            self.logger.info(f"[TOOL] Running dalfox on {len(all_urls)} URLs for XSS testing")
+            dalfox_results = self.tool_integration.run_dalfox(all_urls)
+            results.extend(dalfox_results)
 
         self.logger.info(f"[PHASE] Automated Scanning - Completed - {len(results)} results")
         return results

@@ -43,18 +43,20 @@ except ImportError:
 class FormTester:
     """Tests forms for SQL injection, XSS, and CSRF vulnerabilities."""
 
-    def __init__(self, use_anchor_browser: bool = True, timeout: int = 30):
+    def __init__(self, use_anchor_browser: bool = True, timeout: int = 30, tool_integration=None):
         """
         Initialize form tester.
 
         Args:
             use_anchor_browser: Whether to use Anchor Browser tools
             timeout: HTTP request timeout in seconds
+            tool_integration: Optional ToolIntegration instance for using dalfox and sqlmap
         """
         self.logger = get_logger(f"{__name__}.FormTester")
         self.use_anchor_browser = use_anchor_browser and ANCHOR_BROWSER_AVAILABLE
         self.timeout = timeout
         self.client = httpx.Client(timeout=timeout, follow_redirects=True)
+        self.tool_integration = tool_integration
 
         if self.use_anchor_browser:
             try:
@@ -184,6 +186,19 @@ class FormTester:
 
                 except Exception as e:
                     self.logger.error(f"[ERROR] SQL Injection test failed: {e}")
+                    from vibe_code_bench.core.error_logger import log_exception
+                    log_exception(e, context="red_team_agent.form_tester.test_sql_injection", metadata={"form_url": form_url})
+
+        # Use sqlmap for deep SQL injection testing if available and no findings yet
+        if self.tool_integration and not result.findings:
+            if self.tool_integration.available_tools.get("sqlmap", False):
+                self.logger.info(f"[TOOL] Running sqlmap for deep SQL injection testing on {form_url}")
+                sqlmap_result = self.tool_integration.run_sqlmap(form_info)
+                if sqlmap_result and sqlmap_result.findings:
+                    # Merge sqlmap findings into our result
+                    result.findings.extend(sqlmap_result.findings)
+                    result.status = "vulnerable"
+                    self.logger.warning(f"[TOOL] sqlmap found SQL injection vulnerability on {form_url}")
 
         result.execution_time = time.time() - start_time
         self.logger.info(
@@ -321,6 +336,20 @@ class FormTester:
 
                 except Exception as e:
                     self.logger.error(f"[ERROR] XSS test failed: {e}")
+                    from vibe_code_bench.core.error_logger import log_exception
+                    log_exception(e, context="red_team_agent.form_tester.test_xss", metadata={"form_url": form_url})
+
+        # Use dalfox for enhanced XSS testing if available
+        if self.tool_integration and self.tool_integration.available_tools.get("dalfox", False):
+            self.logger.info(f"[TOOL] Running dalfox for enhanced XSS testing on {form_url}")
+            dalfox_results = self.tool_integration.run_dalfox([form_url])
+            if dalfox_results:
+                for dalfox_result in dalfox_results:
+                    if dalfox_result.findings:
+                        # Merge dalfox findings into our result
+                        result.findings.extend(dalfox_result.findings)
+                        result.status = "vulnerable"
+                        self.logger.warning(f"[TOOL] dalfox found XSS vulnerability on {form_url}")
 
         result.execution_time = time.time() - start_time
         self.logger.info(
@@ -409,6 +438,8 @@ class FormTester:
 
         except Exception as e:
             self.logger.error(f"[ERROR] CSRF test failed: {e}")
+            from vibe_code_bench.core.error_logger import log_exception
+            log_exception(e, context="red_team_agent.form_tester.test_csrf", metadata={"forms": [f.get("url", "unknown") for f in forms[:5]]})
             result.status = "error"
             result.error_message = str(e)
 

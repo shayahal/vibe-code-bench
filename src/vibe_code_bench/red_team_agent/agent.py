@@ -30,7 +30,7 @@ def _create_default_llm():
         return ChatOpenAI(model="gpt-4", temperature=0)
     # Try Anthropic
     elif os.getenv("ANTHROPIC_API_KEY"):
-        return ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
+        return ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0)
     # Try OpenRouter (supports multiple models)
     elif os.getenv("OPENROUTER_API_KEY"):
         return ChatOpenAI(
@@ -71,6 +71,11 @@ class RedTeamAgent:
         run_id = f"red_team_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.run_dir, self.logger = setup_red_team_logging(run_id)
         self.run_id = run_id
+        
+        # Setup error logging
+        from vibe_code_bench.core.error_logger import setup_error_logging
+        error_log_path = self.run_dir / "errors.log"
+        self.error_logger = setup_error_logging(error_log_path)
 
         self.logger.info("[SETUP] Red Team Agent - Initialization - Started")
         self.logger.info(f"[SETUP] Browsing report: {browsing_report_path}")
@@ -159,7 +164,38 @@ class RedTeamAgent:
 
         except Exception as e:
             self.logger.error(f"[ERROR] Red Team Agent workflow failed: {e}", exc_info=True)
+            if self.error_logger:
+                self.error_logger.log_exception(
+                    e,
+                    context="red_team_agent.test",
+                    metadata={"run_id": self.run_id}
+                )
             raise
+        finally:
+            # Save error summary
+            if self.error_logger:
+                try:
+                    error_summary_path = self.run_dir / "errors.json"
+                    self.error_logger.save_summary(error_summary_path)
+                    # Also save to reports folder
+                    from vibe_code_bench.core.paths import get_reports_dir_for_date, extract_base_run_id
+                    try:
+                        if len(self.run_id) >= 17:
+                            date_part = self.run_id[9:17]
+                            date_str = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
+                        else:
+                            date_str = datetime.now().strftime("%Y-%m-%d")
+                        reports_dir = get_reports_dir_for_date(date_str)
+                        # Use unified run folder (extract base run_id without prefix)
+                        base_run_id = extract_base_run_id(self.run_id)
+                        run_folder = reports_dir / base_run_id
+                        run_folder.mkdir(parents=True, exist_ok=True)
+                        reports_error_path = run_folder / "errors.json"
+                        self.error_logger.save_summary(reports_error_path)
+                    except Exception as save_error:
+                        self.logger.warning(f"Failed to save error summary to reports: {save_error}")
+                except Exception as cleanup_error:
+                    self.logger.warning(f"Failed to save error summary: {cleanup_error}")
 
     def generate_report(self, test_results: Optional[list[SecurityTestResult]] = None) -> str:
         """

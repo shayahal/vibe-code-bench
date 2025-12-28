@@ -35,7 +35,7 @@ langfuse>=2.0.0
 # Web Application Security Tools (pip-installable)
 # Note: These are optional and may require manual installation:
 # sqlmap>=1.8.0
-# wapiti3>=3.1.0
+wapiti3>=3.1.0
 # theHarvester
 # scoutsuite>=5.0.0
 
