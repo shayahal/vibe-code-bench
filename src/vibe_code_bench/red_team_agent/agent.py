@@ -1,231 +1,487 @@
-"""Main red team agent class for security testing."""
+"""LangGraph-based red team agent for security scanning.
+
+This agent orchestrates multiple security tools to scan a URL for vulnerabilities.
+All operations are traced with Langfuse for observability.
+"""
 
 import os
 from datetime import datetime
-from typing import Dict, Optional, Any
+from typing import Any
+from urllib.parse import urlparse
 
-# Load environment variables from .env file if available
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # python-dotenv not installed, skip loading .env
+from dotenv import load_dotenv
 
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
+# Load environment variables
+load_dotenv()
 
-from vibe_code_bench.red_team_agent.report_analyzer import ReportAnalyzer
-from vibe_code_bench.red_team_agent.security_tester import SecurityTester
-from vibe_code_bench.red_team_agent.report_generator import ReportGenerator
-from vibe_code_bench.red_team_agent.models import TestingPlan, RedTeamReport, SecurityTestResult
-from vibe_code_bench.red_team_agent.logging_config import setup_red_team_logging, get_logger
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.tools import tool
 
-logger = get_logger(__name__)
+from vibe_code_bench.red_team_agent.models import (
+    ScanReport,
+    ToolResult,
+    VulnerabilityFinding,
+)
+from vibe_code_bench.red_team_agent.exceptions import (
+    AgentError,
+    ConfigurationError,
+    ScanError,
+    ValidationError,
+)
+from vibe_code_bench.red_team_agent.observability import (
+    ObservabilityManager,
+    get_callback_handler,
+    get_logger,
+    traced,
+)
+from vibe_code_bench.red_team_agent.tools import (
+    BrowserTool,
+    NucleiTool,
+    SQLMapTool,
+    DalFoxTool,
+    WapitiTool,
+    NiktoTool,
+    ToolRegistry,
+)
 
 
-def _create_default_llm():
-    """Create a default LLM instance."""
-    # Try OpenAI first
-    if os.getenv("OPENAI_API_KEY"):
-        return ChatOpenAI(model="gpt-4", temperature=0)
-    # Try Anthropic
-    elif os.getenv("ANTHROPIC_API_KEY"):
-        return ChatAnthropic(model="claude-3-5-sonnet-20240620", temperature=0)
-    # Try OpenRouter (supports multiple models)
-    elif os.getenv("OPENROUTER_API_KEY"):
-        return ChatOpenAI(
-            model="openai/gpt-4",
-            temperature=0,
-            base_url="https://openrouter.ai/api/v1",
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-        )
-    else:
-        logger.warning("No LLM API key found. LLM-guided testing will be disabled.")
-        return None
+# System prompt for the security agent
+SECURITY_AGENT_PROMPT = """You are a security expert conducting a vulnerability assessment.
+
+Your goal is to find security vulnerabilities in the target website by using the available scanning tools.
+
+Strategy:
+1. First, use the browser tool to discover pages and forms on the target
+2. Run nuclei for fast vulnerability scanning
+3. Use specialized tools (sqlmap for SQL injection, dalfox for XSS) on interesting endpoints
+4. Run wapiti for comprehensive web app scanning
+5. Check server configuration with nikto
+
+Report all findings accurately. Focus on high-severity vulnerabilities first.
+Do not make up vulnerabilities - only report what the tools actually find.
+"""
 
 
 class RedTeamAgent:
-    """Main red team agent for security testing based on browsing agent reports."""
-
+    """LangGraph-based security scanning agent.
+    
+    This agent orchestrates multiple security tools to scan a URL and
+    produces a comprehensive vulnerability report.
+    
+    Example:
+        agent = RedTeamAgent()
+        report = agent.scan("https://example.com")
+        print(report.total_findings)
+    """
+    
     def __init__(
         self,
-        browsing_report_path: str,
-        enable_automated_scanning: bool = True,
-        enable_llm_testing: bool = True,
-        enable_anchor_browser: bool = True,
-        max_parallel_workers: int = 10,
         llm=None,
+        run_id: str | None = None,
+        enable_llm_agent: bool = True,
     ):
-        """
-        Initialize red team agent.
-
-        Args:
-            browsing_report_path: Path to browsing agent JSON report
-            enable_automated_scanning: Whether to use external tools (nuclei, wapiti3, nikto)
-            enable_llm_testing: Whether to use LLM-guided testing
-            enable_anchor_browser: Whether to use Anchor Browser tools
-            max_parallel_workers: Maximum parallel workers for testing
-            llm: LangChain LLM instance (if None, will try to create default)
-        """
-        # Setup logging first
-        run_id = f"red_team_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        self.run_dir, self.logger = setup_red_team_logging(run_id)
-        self.run_id = run_id
+        """Initialize the red team agent.
         
-        # Setup error logging
-        from vibe_code_bench.core.error_logger import setup_error_logging
-        error_log_path = self.run_dir / "errors.log"
-        self.error_logger = setup_error_logging(error_log_path)
-
-        self.logger.info("[SETUP] Red Team Agent - Initialization - Started")
-        self.logger.info(f"[SETUP] Browsing report: {browsing_report_path}")
-        self.logger.info(f"[SETUP] Automated scanning: {enable_automated_scanning}")
-        self.logger.info(f"[SETUP] LLM testing: {enable_llm_testing}")
-        self.logger.info(f"[SETUP] Anchor Browser: {enable_anchor_browser}")
-
-        self.browsing_report_path = browsing_report_path
-        self.enable_automated_scanning = enable_automated_scanning
-        self.enable_llm_testing = enable_llm_testing
-        self.enable_anchor_browser = enable_anchor_browser
-        self.max_parallel_workers = max_parallel_workers
-
-        # Initialize LLM
-        if llm is None and enable_llm_testing:
-            self.llm = _create_default_llm()
-        else:
-            self.llm = llm
-
-        # Initialize components
-        self.report_analyzer = ReportAnalyzer()
-        self.testing_plan: Optional[TestingPlan] = None
-        self.security_tester: Optional[SecurityTester] = None
-        self.report_generator: Optional[ReportGenerator] = None
-        self.test_results: list[SecurityTestResult] = []
-        self.final_report: Optional[RedTeamReport] = None
-
-        self.logger.info("[SETUP] Red Team Agent - Initialization - Completed")
-
-    def test(self) -> RedTeamReport:
-        """
-        Run complete security testing workflow.
-
-        Returns:
-            RedTeamReport object
-        """
-        self.logger.info("[WORKFLOW] Red Team Agent - Complete Testing Workflow - Started")
-
-        try:
-            # Phase 1: Analyze browsing report
-            self.logger.info("[WORKFLOW] Phase 1: Report Analysis")
-            self.testing_plan = self.report_analyzer.analyze(self.browsing_report_path)
-
-            # Phase 2: Initialize security tester
-            self.logger.info("[WORKFLOW] Phase 2: Initialize Security Tester")
-            self.security_tester = SecurityTester(
-                testing_plan=self.testing_plan,
-                enable_automated_scanning=self.enable_automated_scanning,
-                enable_llm_testing=self.enable_llm_testing,
-                use_anchor_browser=self.enable_anchor_browser,
-                max_parallel_workers=self.max_parallel_workers,
-                llm=self.llm,
-            )
-
-            # Phase 3: Run all security tests
-            self.logger.info("[WORKFLOW] Phase 3: Run Security Tests")
-            self.test_results = self.security_tester.run_all_tests()
-
-            # Phase 4: Generate report
-            self.logger.info("[WORKFLOW] Phase 4: Generate Report")
-            self.report_generator = ReportGenerator(base_url=self.testing_plan.base_url, testing_plan=self.testing_plan)
-
-            testing_methodology = {
-                "automated_scanning": self.enable_automated_scanning,
-                "llm_testing": self.enable_llm_testing,
-                "anchor_browser": self.enable_anchor_browser,
-                "test_results_count": len(self.test_results),
-            }
-
-            self.final_report = self.report_generator.generate_report(
-                self.test_results, testing_methodology
-            )
-
-            # Phase 5: Save report
-            self.logger.info("[WORKFLOW] Phase 5: Save Report")
-            report_path = self.report_generator.save_report(self.final_report, self.run_id, self.run_dir)
-
-            self.logger.info("[WORKFLOW] Red Team Agent - Complete Testing Workflow - Completed")
-            self.logger.info(f"[WORKFLOW] Report saved to: {report_path}")
-
-            # Cleanup
-            if self.security_tester:
-                self.security_tester.cleanup()
-
-            return self.final_report
-
-        except Exception as e:
-            self.logger.error(f"[ERROR] Red Team Agent workflow failed: {e}", exc_info=True)
-            if self.error_logger:
-                self.error_logger.log_exception(
-                    e,
-                    context="red_team_agent.test",
-                    metadata={"run_id": self.run_id}
-                )
-            raise
-        finally:
-            # Save error summary
-            if self.error_logger:
-                try:
-                    error_summary_path = self.run_dir / "errors.json"
-                    self.error_logger.save_summary(error_summary_path)
-                    # Also save to reports folder
-                    from vibe_code_bench.core.paths import get_reports_dir_for_date, extract_base_run_id
-                    try:
-                        if len(self.run_id) >= 17:
-                            date_part = self.run_id[9:17]
-                            date_str = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
-                        else:
-                            date_str = datetime.now().strftime("%Y-%m-%d")
-                        reports_dir = get_reports_dir_for_date(date_str)
-                        # Use unified run folder (extract base run_id without prefix)
-                        base_run_id = extract_base_run_id(self.run_id)
-                        run_folder = reports_dir / base_run_id
-                        run_folder.mkdir(parents=True, exist_ok=True)
-                        reports_error_path = run_folder / "errors.json"
-                        self.error_logger.save_summary(reports_error_path)
-                    except Exception as save_error:
-                        self.logger.warning(f"Failed to save error summary to reports: {save_error}")
-                except Exception as cleanup_error:
-                    self.logger.warning(f"Failed to save error summary: {cleanup_error}")
-
-    def generate_report(self, test_results: Optional[list[SecurityTestResult]] = None) -> str:
-        """
-        Generate and save security assessment report.
-
         Args:
-            test_results: Optional test results (uses self.test_results if not provided)
-
-        Returns:
-            Path to saved report file
+            llm: LangChain LLM instance. If None, creates default based on env vars.
+            run_id: Optional run identifier for tracing.
+            enable_llm_agent: If True, use LLM for intelligent tool orchestration.
+                            If False, run tools in fixed sequence.
         """
-        if test_results is None:
-            test_results = self.test_results
+        # Initialize observability
+        self.obs = ObservabilityManager.get_instance(run_id)
+        self.logger = get_logger(__name__)
+        self.run_id = self.obs.run_id
+        
+        self.enable_llm_agent = enable_llm_agent
+        
+        # Initialize LLM if agent mode enabled
+        self.llm = None
+        if enable_llm_agent:
+            self.llm = llm or self._create_default_llm()
+        
+        # Initialize tools
+        self._init_tools()
+        
+        # Create LangGraph agent if LLM available
+        self.agent = None
+        if self.llm and enable_llm_agent:
+            self.agent = self._create_agent()
+        
+        self.logger.info(f"RedTeamAgent initialized | run_id={self.run_id}")
+        self.logger.info(f"LLM Agent: {'enabled' if self.agent else 'disabled'}")
+        self.logger.info(f"Available tools: {ToolRegistry.list_available()}")
+        self.logger.info(f"Unavailable tools: {ToolRegistry.list_unavailable()}")
+    
+    def _create_default_llm(self):
+        """Create default LLM based on environment variables."""
+        # Try OpenAI
+        if os.getenv("OPENAI_API_KEY"):
+            from langchain_openai import ChatOpenAI
+            self.logger.info("Using OpenAI GPT-4")
+            return ChatOpenAI(model="gpt-4o", temperature=0)
+        
+        # Try Anthropic
+        if os.getenv("ANTHROPIC_API_KEY"):
+            from langchain_anthropic import ChatAnthropic
+            self.logger.info("Using Anthropic Claude")
+            return ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
+        
+        # Try OpenRouter
+        if os.getenv("OPENROUTER_API_KEY"):
+            from langchain_openai import ChatOpenAI
+            self.logger.info("Using OpenRouter")
+            return ChatOpenAI(
+                model="openai/gpt-4o",
+                temperature=0,
+                base_url="https://openrouter.ai/api/v1",
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+            )
+        
+        self.logger.warning(
+            "No LLM API key found. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY. "
+            "Running in tool-only mode (no LLM orchestration)."
+        )
+        return None
+    
+    def _init_tools(self) -> None:
+        """Initialize and register security tools."""
+        # Create tool instances
+        self.browser_tool = BrowserTool(required=False)
+        self.nuclei_tool = NucleiTool(required=False)
+        self.sqlmap_tool = SQLMapTool(required=False)
+        self.dalfox_tool = DalFoxTool(required=False)
+        self.wapiti_tool = WapitiTool(required=False)
+        self.nikto_tool = NiktoTool(required=False)
+        
+        # Register tools
+        ToolRegistry.register(self.browser_tool)
+        ToolRegistry.register(self.nuclei_tool)
+        ToolRegistry.register(self.sqlmap_tool)
+        ToolRegistry.register(self.dalfox_tool)
+        ToolRegistry.register(self.wapiti_tool)
+        ToolRegistry.register(self.nikto_tool)
+    
+    def _create_agent(self):
+        """Create LangGraph ReAct agent."""
+        try:
+            from langgraph.prebuilt import create_react_agent
+            
+            # Create LangChain tools from our tool wrappers
+            langchain_tools = self._create_langchain_tools()
+            
+            # Create agent
+            agent = create_react_agent(
+                self.llm,
+                langchain_tools,
+                state_modifier=SECURITY_AGENT_PROMPT,
+            )
+            
+            self.logger.info("LangGraph agent created successfully")
+            return agent
+            
+        except ImportError:
+            self.logger.warning(
+                "LangGraph not installed. Install with: pip install langgraph. "
+                "Running in tool-only mode."
+            )
+            return None
+        except Exception as e:
+            self.logger.error(f"Failed to create LangGraph agent: {e}")
+            return None
+    
+    def _create_langchain_tools(self) -> list:
+        """Create LangChain tool wrappers for the agent."""
+        tools = []
+        
+        @tool
+        def scan_with_browser(url: str) -> str:
+            """Scan a URL with the browser tool to check security headers, CSRF, and info disclosure."""
+            result = self.browser_tool.scan(url)
+            if result.success:
+                findings = [f"{f.vulnerability_type}: {f.description}" for f in result.findings]
+                return f"Found {len(result.findings)} issues: {'; '.join(findings) if findings else 'None'}"
+            return f"Error: {result.error_message}"
+        
+        @tool
+        def discover_urls(url: str) -> str:
+            """Discover URLs on a website for further scanning."""
+            urls = self.browser_tool.discover_urls(url)
+            return f"Discovered {len(urls)} URLs: {', '.join(urls[:10])}" + ("..." if len(urls) > 10 else "")
+        
+        @tool
+        def scan_with_nuclei(url: str) -> str:
+            """Run nuclei vulnerability scanner on a URL."""
+            if not self.nuclei_tool.available:
+                return "Nuclei not available"
+            result = self.nuclei_tool.scan(url)
+            if result.success:
+                findings = [f"{f.vulnerability_type} ({f.severity})" for f in result.findings]
+                return f"Found {len(result.findings)} vulnerabilities: {'; '.join(findings) if findings else 'None'}"
+            return f"Error: {result.error_message}"
+        
+        @tool
+        def scan_for_sqli(url: str) -> str:
+            """Run SQLMap to check for SQL injection vulnerabilities."""
+            if not self.sqlmap_tool.available:
+                return "SQLMap not available"
+            result = self.sqlmap_tool.scan(url)
+            if result.success:
+                if result.findings:
+                    return f"SQL INJECTION FOUND: {result.findings[0].description}"
+                return "No SQL injection found"
+            return f"Error: {result.error_message}"
+        
+        @tool
+        def scan_for_xss(url: str) -> str:
+            """Run DalFox to check for XSS vulnerabilities."""
+            if not self.dalfox_tool.available:
+                return "DalFox not available"
+            result = self.dalfox_tool.scan(url)
+            if result.success:
+                if result.findings:
+                    return f"XSS FOUND: {result.findings[0].description}"
+                return "No XSS found"
+            return f"Error: {result.error_message}"
+        
+        @tool
+        def scan_with_wapiti(url: str) -> str:
+            """Run Wapiti web vulnerability scanner."""
+            if not self.wapiti_tool.available:
+                return "Wapiti not available"
+            result = self.wapiti_tool.scan(url)
+            if result.success:
+                findings = [f"{f.vulnerability_type}" for f in result.findings]
+                return f"Found {len(result.findings)} issues: {'; '.join(findings) if findings else 'None'}"
+            return f"Error: {result.error_message}"
+        
+        @tool
+        def scan_with_nikto(url: str) -> str:
+            """Run Nikto web server scanner."""
+            if not self.nikto_tool.available:
+                return "Nikto not available"
+            result = self.nikto_tool.scan(url)
+            if result.success:
+                findings = [f"{f.vulnerability_type}" for f in result.findings[:5]]
+                return f"Found {len(result.findings)} issues: {'; '.join(findings) if findings else 'None'}"
+            return f"Error: {result.error_message}"
+        
+        tools = [
+            scan_with_browser,
+            discover_urls,
+            scan_with_nuclei,
+            scan_for_sqli,
+            scan_for_xss,
+            scan_with_wapiti,
+            scan_with_nikto,
+        ]
+        
+        return tools
+    
+    def _validate_url(self, url: str) -> str:
+        """Validate and normalize URL.
+        
+        Args:
+            url: URL to validate
+            
+        Returns:
+            Normalized URL
+            
+        Raises:
+            ValidationError: If URL is invalid
+        """
+        if not url:
+            raise ValidationError("URL cannot be empty")
+        
+        # Add scheme if missing
+        if not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
+        
+        # Parse and validate
+        parsed = urlparse(url)
+        if not parsed.netloc:
+            raise ValidationError(f"Invalid URL: {url}")
+        
+        return url
+    
+    @traced("scan")
+    def scan(self, url: str) -> ScanReport:
+        """Scan a URL for security vulnerabilities.
+        
+        Args:
+            url: Target URL to scan
+            
+        Returns:
+            ScanReport with all findings
+            
+        Raises:
+            ValidationError: If URL is invalid
+            ScanError: If scan fails
+            AgentError: If agent fails
+        """
+        # Validate URL
+        url = self._validate_url(url)
+        
+        self.logger.info(f"Starting security scan | url={url}")
+        
+        # Create report
+        report = ScanReport(
+            target_url=url,
+            scan_id=self.run_id,
+            tools_available=ToolRegistry.list_available(),
+        )
+        
+        try:
+            if self.agent:
+                # Use LLM agent for intelligent scanning
+                report = self._scan_with_agent(url, report)
+            else:
+                # Run tools in fixed sequence
+                report = self._scan_sequential(url, report)
+            
+            # Finalize report
+            report = report.finalize()
+            
+            self.logger.info(
+                f"Scan complete | findings={report.total_findings} | "
+                f"critical={report.findings_by_severity.get('Critical', 0)} | "
+                f"high={report.findings_by_severity.get('High', 0)}"
+            )
+            
+            return report
+            
+        except Exception as e:
+            self.logger.error(f"Scan failed: {e}")
+            raise ScanError(url, str(e)) from e
+    
+    def _scan_with_agent(self, url: str, report: ScanReport) -> ScanReport:
+        """Run scan using LLM agent for intelligent tool orchestration."""
+        self.logger.info("Running LLM-guided scan")
+        
+        # Get callback handler for Langfuse tracing
+        callbacks = []
+        handler = get_callback_handler()
+        if handler:
+            callbacks.append(handler)
+        
+        # Invoke agent
+        prompt = f"Scan {url} for security vulnerabilities. Use all available tools systematically."
+        
+        try:
+            result = self.agent.invoke(
+                {"messages": [HumanMessage(content=prompt)]},
+                config={"callbacks": callbacks} if callbacks else None,
+            )
+            
+            # Extract findings from agent execution
+            # The agent stores results in tool calls, we collect them
+            # For now, also run tools directly to ensure we get results
+            report = self._scan_sequential(url, report)
+            
+        except Exception as e:
+            self.logger.error(f"Agent execution failed: {e}")
+            # Fall back to sequential scanning
+            report = self._scan_sequential(url, report)
+        
+        return report
+    
+    def _scan_sequential(self, url: str, report: ScanReport) -> ScanReport:
+        """Run tools in a fixed sequence."""
+        self.logger.info("Running sequential scan")
+        
+        # 1. Browser-based checks (always available)
+        self.logger.info("Running browser checks...")
+        browser_result = self.browser_tool.scan(url)
+        report.tool_results.append(browser_result)
+        
+        # 2. Nuclei scan
+        if self.nuclei_tool.available:
+            self.logger.info("Running nuclei scan...")
+            nuclei_result = self.nuclei_tool.scan(url)
+            report.tool_results.append(nuclei_result)
+        
+        # 3. Discover URLs for deeper scanning
+        discovered_urls = self.browser_tool.discover_urls(url)
+        forms = self.browser_tool.extract_forms(url)
+        
+        # 4. SQLMap on forms
+        if self.sqlmap_tool.available and forms:
+            self.logger.info(f"Running SQLMap on {len(forms)} forms...")
+            for form in forms[:3]:  # Limit to first 3 forms
+                if form.get("method") == "post":
+                    form_data = {f["name"]: "test" for f in form.get("fields", []) if f.get("name")}
+                    if form_data:
+                        sqlmap_result = self.sqlmap_tool.scan(form["action"], data="&".join(f"{k}={v}" for k, v in form_data.items()))
+                        report.tool_results.append(sqlmap_result)
+        
+        # 5. DalFox XSS scan
+        if self.dalfox_tool.available:
+            self.logger.info("Running DalFox XSS scan...")
+            dalfox_result = self.dalfox_tool.scan(url)
+            report.tool_results.append(dalfox_result)
+        
+        # 6. Wapiti comprehensive scan
+        if self.wapiti_tool.available:
+            self.logger.info("Running Wapiti scan...")
+            wapiti_result = self.wapiti_tool.scan(url)
+            report.tool_results.append(wapiti_result)
+        
+        # 7. Nikto server scan
+        if self.nikto_tool.available:
+            self.logger.info("Running Nikto scan...")
+            nikto_result = self.nikto_tool.scan(url)
+            report.tool_results.append(nikto_result)
+        
+        return report
+    
+    def save_report(self, report: ScanReport, output_path: str | None = None) -> str:
+        """Save scan report to file.
+        
+        Args:
+            report: ScanReport to save
+            output_path: Optional output path. If None, saves to default location.
+            
+        Returns:
+            Path to saved report
+        """
+        import json
+        from vibe_code_bench.core.paths import get_reports_dir_for_date
+        
+        if output_path is None:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            reports_dir = get_reports_dir_for_date(date_str)
+            run_folder = reports_dir / f"run_{self.run_id.replace('red_team_', '')}"
+            run_folder.mkdir(parents=True, exist_ok=True)
+            output_path = str(run_folder / "security_report.json")
+        
+        with open(output_path, "w") as f:
+            json.dump(report.to_dict(), f, indent=2, default=str)
+        
+        self.logger.info(f"Report saved to {output_path}")
+        return output_path
+    
+    def cleanup(self) -> None:
+        """Cleanup resources."""
+        self.browser_tool.close()
+        self.obs.shutdown()
 
-        if not test_results:
-            raise ValueError("No test results available. Run test() first.")
 
-        if not self.report_generator:
-            if not self.testing_plan:
-                raise ValueError("No testing plan available. Run test() first.")
-            self.report_generator = ReportGenerator(base_url=self.testing_plan.base_url, testing_plan=self.testing_plan)
-
-        testing_methodology = {
-            "automated_scanning": self.enable_automated_scanning,
-            "llm_testing": self.enable_llm_testing,
-            "anchor_browser": self.enable_anchor_browser,
-            "test_results_count": len(test_results),
-        }
-
-        report = self.report_generator.generate_report(test_results, testing_methodology)
-        report_path = self.report_generator.save_report(report, self.run_id)
-
-        return str(report_path)
+def scan(url: str, **kwargs) -> ScanReport:
+    """Convenience function to scan a URL.
+    
+    Args:
+        url: Target URL to scan
+        **kwargs: Additional arguments passed to RedTeamAgent
+        
+    Returns:
+        ScanReport with findings
+        
+    Example:
+        report = scan("https://example.com")
+        print(f"Found {report.total_findings} vulnerabilities")
+    """
+    agent = RedTeamAgent(**kwargs)
+    try:
+        return agent.scan(url)
+    finally:
+        agent.cleanup()

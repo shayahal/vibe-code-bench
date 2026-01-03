@@ -7,7 +7,7 @@ name = "vibe-code-bench"
 version = "0.1.0"
 description = "Benchmark for the security of vibe coded apps - Red Team Agent and Website Generator"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "Vibe Code Bench Contributors"}
@@ -19,37 +19,47 @@ classifiers = [
     "Intended Audience :: Information Technology",
     "Topic :: Security",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = [
-    "langchain>=0.1.0",
-    "langchain-openai>=0.0.5",
-    "langchain-anthropic>=0.1.0",
-    "langchain-community>=0.0.20",
+    # LLM & Agent Framework
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.2.0",
+    "langchain-community>=0.3.0",
+    "langgraph>=0.2.0",
     "openai>=1.12.0",
+    
+    # Observability
     "langfuse>=2.0.0",
-    "crewai>=0.28.0",
-    "crewai[tools]>=0.28.0",
+    
+    # Data validation
+    "pydantic>=2.0.0",
+    
+    # HTTP & Web
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
     "httpx>=0.25.0",
-    "flask>=2.3.0",
     "beautifulsoup4>=4.12.0",
     "lxml>=4.9.0",
-    "playwright>=1.40.0",
     "urllib3>=2.0.0",
     "url-normalize>=1.4.3",
+    
+    # Optional (for browsing agent)
+    "flask>=2.3.0",
+    "playwright>=1.40.0",
+    
+    # Testing
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-mock>=3.11.0",
     "pytest-cov>=4.1.0",
     "responses>=0.23.0",
-    "wapiti3>=3.1.0",  # Web application vulnerability scanner (optional but recommended)
 ]
 
 [project.optional-dependencies]
@@ -75,11 +85,11 @@ where = ["src"]
 
 [tool.black]
 line-length = 100
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+target-version = ['py310', 'py311', 'py312', 'py313']
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+target-version = "py310"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
